@@ -4,14 +4,13 @@ WORKDIR /app
 
 # Python deps
 COPY backend/pyproject.toml .
-RUN pip install --no-cache-dir fastapi uvicorn psycopg2-binary
+RUN pip install --no-cache-dir fastapi uvicorn[standard] psycopg2-binary
 
 # App code
 COPY backend/main.py .
-COPY html/ /usr/share/nginx/html/
-COPY nginx.conf /etc/nginx/nginx.conf
+COPY html/ /app/html/
 
-EXPOSE 80 443 8000
+EXPOSE 8000
 
-# Run nginx + uvicorn
-CMD nginx && uvicorn main:app --host 0.0.0.0 --port 8000
+# Run uvicorn only — Render terminates TLS at the edge
+CMD uvicorn main:app --host 0.0.0.0 --port 8000

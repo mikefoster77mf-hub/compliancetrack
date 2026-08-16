@@ -1,8 +1,12 @@
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 import os, socket, psycopg2, psycopg2.extras, time
 
 app = FastAPI()
+
+# Serve static files from /app/html/ at the root
+app.mount("/", StaticFiles(directory="/app/html", html=True), name="static")
 
 DB_HOST = os.getenv("DB_HOST", "db")
 DB_USER = os.getenv("POSTGRES_USER", "myuser")
