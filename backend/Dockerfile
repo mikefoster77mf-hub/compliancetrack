@@ -2,11 +2,11 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# ── Python deps ──
+# Python deps
 COPY backend/pyproject.toml .
 RUN pip install --no-cache-dir fastapi uvicorn psycopg2-binary
 
-# ── App code ──
+# App code
 COPY backend/main.py .
 COPY html/ /usr/share/nginx/html/
 COPY nginx.conf /etc/nginx/nginx.conf
