@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ComplianceTrack — Vendor Compliance</title>
+  <meta name="description" content="Automated vendor compliance and Certificate of Insurance tracking for General Contractors. Never chase a missing certificate or miss an audit deadline again.">
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="ComplianceTrack — Automated Vendor Compliance & COI Tracking">
+  <meta property="og:description" content="Automated certificate of insurance tracking for General Contractors. Daily checks, automated reminders, and a real-time compliance dashboard.">
+  <meta property="og:url" content="https://localhost">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 36 36' fill='none'%3E%3Cpath d='M18 3L4 9v6c0 7.5 5 12.5 14 14.5 9-2 14-7 14-14.5V9L18 3z' fill='%23a855f7' opacity='0.15'/%3E%3Cpath d='M18 3L4 9v6c0 7.5 5 12.5 14 14.5 9-2 14-7 14-14.5V9L18 3z' stroke='%23a855f7' stroke-width='2' stroke-linejoin='round'/%3E%3Cpath d='M13 18l4 4 10-10' stroke='%23a855f7' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+
+  <link rel="stylesheet" href="/style.css?v=3">
+</head>
+<body>
+  <div class="wrapper">
+
+    <!-- ── Hero ─────────────────────────────────────────────── -->
+    <header class="site-header">
+      <div class="logo">
+        <!-- Simple compliance mark: shield with checkmark -->
+        <svg width="36" height="36" viewBox="0 0 36 36" fill="none" aria-hidden="true">
+          <path d="M18 3L4 9v6c0 7.5 5 12.5 14 14.5 9-2 14-7 14-14.5V9L18 3z" fill="var(--accent-primary)" opacity="0.15"/>
+          <path d="M18 3L4 9v6c0 7.5 5 12.5 14 14.5 9-2 14-7 14-14.5V9L18 3z" stroke="var(--accent-primary)" stroke-width="2" stroke-linejoin="round"/>
+          <path d="M13 18l4 4 10-10" stroke="var(--accent-primary)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span class="brand">ComplianceTrack</span>
+        <span style="font-size:11px; color:var(--text-hinting); margin-left:6px; font-style:italic;">working title</span>
+      </div>
+      <h1>Vendor Compliance, Automated.</h1>
+      <p>
+        Certificates of insurance expire. Audit deadlines slip. Vendors forget to send renewals.
+        Stop chasing paperwork and start seeing compliance at a glance — automated checks,
+        reminders, and a live dashboard for every project.
+      </p>
+    </header>
+
+    <!-- ── Navigation ───────────────────────────────────────── -->
+    <nav class="nav" aria-label="Page navigation">
+      <a href="#how-it-works">How it works</a>
+      <a href="#pricing">Pricing</a>
+      <a href="#waitlist">Waitlist</a>
+    </nav>
+
+    <div class="btn-row" style="justify-content:center; margin-bottom:var(--space-xl);">
+      <a href="#waitlist" class="btn primary">Join the waitlist</a>
+    </div>
+
+    <main>
+
+      <!-- ── Problem ────────────────────────────────────────── -->
+      <section class="card featured">
+        <div class="section-head">
+          <h2>The problem every GC knows</h2>
+        </div>
+        <div style="display:grid; gap:var(--space-lg); grid-template-columns:repeat(auto-fit, minmax(240px,1fr));">
+          <div style="background:var(--surface-elevated); border:1px solid var(--border-subtle); border-radius:var(--radius-lg); padding:var(--space-lg);">
+            <div style="margin-bottom:var(--space-sm);">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent-primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M12 2v20M2 12h20M6 6l12 12M18 6L6 18"/>
+              </svg>
+            </div>
+            <p style="font-size:var(--text-title); font-weight:700; margin-bottom:var(--space-sm);">Missed renewals</p>
+            <p style="color:var(--text-secondary);">
+              A vendor's COI lapses and you don't find out until an incident happens — or an auditor
+              flags it. By then it's a liability problem, not a paperwork problem.
+            </p>
+          </div>
+          <div style="background:var(--surface-elevated); border:1px solid var(--border-subtle); border-radius:var(--radius-lg); padding:var(--space-lg);">
+            <div style="margin-bottom:var(--space-sm);">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent-secondary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+              </svg>
+            </div>
+            <p style="font-size:var(--text-title); font-weight:700; margin-bottom:var(--space-sm);">Audit panic</p>
+            <p style="color:var(--text-secondary);">
+              Month-end or year-end audits mean scrambling to collect certificates from 20+ vendors
+              who all "sent it last week." Nobody has a clean, current list.
+            </p>
+          </div>
+          <div style="background:var(--surface-elevated); border:1px solid var(--border-subtle); border-radius:var(--radius-lg); padding:var(--space-lg);">
+            <div style="margin-bottom:var(--space-sm);">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent-tertiary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                <line x1="3" y1="9" x2="21" y2="9"/>
+                <line x1="9" y1="21" x2="9" y2="9"/>
+              </svg>
+            </div>
+            <p style="font-size:var(--text-title); font-weight:700; margin-bottom:var(--space-sm);">Spreadsheet sprawl</p>
+            <p style="color:var(--text-secondary);">
+              Compliance tracking lives in a spreadsheet that's three versions behind reality.
+              Someone updated it, someone didn't, and nobody's sure which is correct.
+            </p>
+          </div>
+          <div style="background:var(--surface-elevated); border:1px solid var(--border-subtle); border-radius:var(--radius-lg); padding:var(--space-lg);">
+            <div style="margin-bottom:var(--space-sm);">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--error)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M22 16.92v3a2 2 0 01-2.12 2.12H17.88a2 2 0 01-1.44-.56l-1.92-2.3A2 2 0 0112.16 15.56V14a2 2 0 012-2h3.76a2 2 0 011.44.56l1.92 2.3A2 2 0 0121.88 14.92V16.92M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+              </svg>
+            </div>
+            <p style="font-size:var(--text-title); font-weight:700; margin-bottom:var(--space-sm);">Manual follow-up</p>
+            <p style="color:var(--text-secondary);">
+              You or your PM team is sending reminder emails, making phone calls, and filing PDFs
+              by hand — every single renewal cycle, for every active project.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── Solution ───────────────────────────────────────── -->
+      <section class="card">
+        <div class="section-head">
+          <h2>What ComplianceTrack does</h2>
+          <p>
+            It automates the parts of vendor compliance that eat up project management time —
+            monitoring, reminding, collecting, and surfacing status. You see what's compliant and
+            what isn't, without chasing anyone.
+          </p>
+        </div>
+        <div style="display:grid; gap:var(--space-lg); grid-template-columns:repeat(auto-fit, minmax(260px,1fr));">
+          <div style="display:flex; gap:var(--space-md); align-items:flex-start;">
+            <div style="width:32px; height:32px; border-radius:50%; background:var(--accent-primary); display:flex; align-items:center; justify-content:center; color:var(--text-on-accent); font-weight:700; flex-shrink:0;">1</div>
+            <div>
+              <h3 style="font-size:var(--text-title); margin-bottom:var(--space-xs);">Daily certificate monitoring</h3>
+              <p style="color:var(--text-secondary); font-size:var(--text-body);">
+                Every vendor certificate is checked daily against its expiration date. Nothing slips
+                through because someone forgot to look at a spreadsheet.
+              </p>
+            </div>
+          </div>
+          <div style="display:flex; gap:var(--space-md); align-items:flex-start;">
+            <div style="width:32px; height:32px; border-radius:50%; background:var(--accent-primary); display:flex; align-items:center; justify-content:center; color:var(--text-on-accent); font-weight:700; flex-shrink:0;">2</div>
+            <div>
+              <h3 style="font-size:var(--text-title); margin-bottom:var(--space-xs);">Automated reminders</h3>
+              <p style="color:var(--text-secondary); font-size:var(--text-body);">
+                Vendors get emailed before their certificates expire — 60, 30, and 7 days out.
+                You don't send the reminders; the system does.
+              </p>
+            </div>
+          </div>
+          <div style="display:flex; gap:var(--space-md); align-items:flex-start;">
+            <div style="width:32px; height:32px; border-radius:50%; background:var(--accent-primary); display:flex; align-items:center; justify-content:center; color:var(--text-on-accent); font-weight:700; flex-shrink:0;">3</div>
+            <div>
+              <h3 style="font-size:var(--text-title); margin-bottom:var(--space-xs);">Magic upload links</h3>
+              <p style="color:var(--text-secondary); font-size:var(--text-body);">
+                Send a vendor a single link. They upload their COI and it lands in the right project —
+                no portal login, no account creation, no back-and-forth.
+              </p>
+            </div>
+          </div>
+          <div style="display:flex; gap:var(--space-md); align-items:flex-start;">
+            <div style="width:32px; height:32px; border-radius:50%; background:var(--accent-primary); display:flex; align-items:center; justify-content:center; color:var(--text-on-accent); font-weight:700; flex-shrink:0;">4</div>
+            <div>
+              <h3 style="font-size:var(--text-title); margin-bottom:var(--space-xs);">Live compliance dashboard</h3>
+              <p style="color:var(--text-secondary); font-size:var(--text-body);">
+                Every project, every vendor, current status — green, yellow, red. One view. No
+                spreadsheets. Ready for an auditor at any moment.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── How it works ───────────────────────────────────── -->
+      <section class="card" id="how-it-works">
+        <div class="section-head">
+          <h2>How it works</h2>
+        </div>
+        <div style="display:grid; gap:var(--space-lg); grid-template-columns:repeat(auto-fit, minmax(220px,1fr));">
+          <div style="background:var(--surface); border:1px solid var(--border-subtle); border-radius:var(--radius-xl); padding:var(--space-xl); text-align:center;">
+            <div style="width:48px; height:48px; border-radius:50%; background:var(--accent-primary); margin:0 auto var(--space-lg); display:flex; align-items:center; justify-content:center; color:var(--text-on-accent); font-size:20px; font-weight:700;">1</div>
+            <h3 style="font-size:var(--text-title); margin-bottom:var(--space-sm);">Add your vendors</h3>
+            <p style="color:var(--text-secondary);">
+              Import or enter the vendors on each project. Name, certificate type, expiration date —
+              we'll track it from there.
+            </p>
+          </div>
+          <div style="background:var(--surface); border:1px solid var(--border-subtle); border-radius:var(--radius-xl); padding:var(--space-xl); text-align:center;">
+            <div style="width:48px; height:48px; border-radius:50%; background:var(--accent-primary); margin:0 auto var(--space-lg); display:flex; align-items:center; justify-content:center; color:var(--text-on-accent); font-size:20px; font-weight:700;">2</div>
+            <h3 style="font-size:var(--text-title); margin-bottom:var(--space-sm);">We monitor daily</h3>
+            <p style="color:var(--text-secondary);">
+              The system checks every certificate every day. Expiring soon? It's flagged. Already
+              expired? It's red. No manual checking required.
+            </p>
+          </div>
+          <div style="background:var(--surface); border:1px solid var(--border-subtle); border-radius:var(--radius-xl); padding:var(--space-xl); text-align:center;">
+            <div style="width:48px; height:48px; border-radius:50%; background:var(--accent-primary); margin:0 auto var(--space-lg); display:flex; align-items:center; justify-content:center; color:var(--text-on-accent); font-size:20px; font-weight:700;">3</div>
+            <h3 style="font-size:var(--text-title); margin-bottom:var(--space-sm);">Vendors get reminders</h3>
+            <p style="color:var(--text-secondary);">
+              Automated emails go out at 60, 30, and 7 days before expiration. Each email includes a
+              magic upload link — the vendor drops their COI in and it's done.
+            </p>
+          </div>
+          <div style="background:var(--surface); border:1px solid var(--border-subtle); border-radius:var(--radius-xl); padding:var(--space-xl); text-align:center;">
+            <div style="width:48px; height:48px; border-radius:50%; background:var(--accent-primary); margin:0 auto var(--space-lg); display:flex; align-items:center; justify-content:center; color:var(--text-on-accent); font-size:20px; font-weight:700;">4</div>
+            <h3 style="font-size:var(--text-title); margin-bottom:var(--space-sm);">You see the dashboard</h3>
+            <p style="color:var(--text-secondary);">
+              Open the dashboard any time. Every project, every vendor, current compliance status.
+              Audit-ready, anytime.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── Pricing ────────────────────────────────────────── -->
+      <section class="card" id="pricing">
+        <div class="section-head">
+          <h2>Pricing</h2>
+          <p>Simple per-project pricing. No hidden fees, no per-user charges, no surprises.</p>
+        </div>
+        <div style="display:grid; gap:var(--space-lg); grid-template-columns:repeat(auto-fit, minmax(240px,1fr));">
+          <div style="background:var(--surface); border:1px solid var(--border-subtle); border-radius:var(--radius-xl); padding:var(--space-xl); text-align:center;">
+            <div style="font-size:var(--text-display); font-weight:800; color:var(--accent-primary); margin-bottom:var(--space-sm);">$49</div>
+            <div style="font-size:var(--text-body); color:var(--text-secondary); margin-bottom:var(--space-lg);">per project / month</div>
+            <ul style="list-style:none; text-align:left; display:inline-block;">
+              <li style="padding:var(--space-sm) 0; border-bottom:1px solid var(--border-subtle); color:var(--text-primary);">✓ Up to 25 vendors</li>
+              <li style="padding:var(--space-sm) 0; border-bottom:1px solid var(--border-subtle); color:var(--text-primary);">✓ Daily monitoring & reminders</li>
+              <li style="padding:var(--space-sm) 0; border-bottom:1px solid var(--border-subtle); color:var(--text-primary);">✓ Magic upload links</li>
+              <li style="padding:var(--space-sm) 0; border-bottom:1px solid var(--border-subtle); color:var(--text-primary);">✓ Compliance dashboard</li>
+              <li style="padding:var(--space-sm) 0; color:var(--text-primary);">✓ Email support</li>
+            </ul>
+            <div style="margin-top:var(--space-lg);">
+              <a href="#waitlist" class="btn" style="width:100%; justify-content:center;">Join waitlist</a>
+            </div>
+          </div>
+          <div style="background:var(--surface); border:2px solid var(--accent-primary); border-radius:var(--radius-xl); padding:var(--space-xl); text-align:center;">
+            <div style="font-size:12px; text-transform:uppercase; letter-spacing:0.08em; color:var(--text-hinting); margin-bottom:var(--space-xs);">Most popular</div>
+            <div style="font-size:var(--text-display); font-weight:800; color:var(--accent-primary); margin-bottom:var(--space-sm);">$79</div>
+            <div style="font-size:var(--text-body); color:var(--text-secondary); margin-bottom:var(--space-lg);">per project / month</div>
+            <ul style="list-style:none; text-align:left; display:inline-block;">
+              <li style="padding:var(--space-sm) 0; border-bottom:1px solid var(--border-subtle); color:var(--text-primary);">✓ Unlimited vendors</li>
+              <li style="padding:var(--space-sm) 0; border-bottom:1px solid var(--border-subtle); color:var(--text-primary);">✓ Daily monitoring & reminders</li>
+              <li style="padding:var(--space-sm) 0; border-bottom:1px solid var(--border-subtle); color:var(--text-primary);">✓ Magic upload links</li>
+              <li style="padding:var(--space-sm) 0; border-bottom:1px solid var(--border-subtle); color:var(--text-primary);">✓ Compliance dashboard</li>
+              <li style="padding:var(--space-sm) 0; border-bottom:1px solid var(--border-subtle); color:var(--text-primary);">✓ Priority email support</li>
+              <li style="padding:var(--space-sm) 0; color:var(--text-primary);">✓ Early access & feature input</li>
+            </ul>
+            <div style="margin-top:var(--space-lg);">
+              <a href="#waitlist" class="btn primary" style="width:100%; justify-content:center;">Join waitlist</a>
+            </div>
+          </div>
+          <div style="background:var(--surface-elevated); border:1px solid var(--border-subtle); border-radius:var(--radius-xl); padding:var(--space-xl); text-align:center;">
+            <div style="font-size:var(--text-display); font-weight:800; color:var(--accent-primary); margin-bottom:var(--space-sm);">$99</div>
+            <div style="font-size:var(--text-body); color:var(--text-secondary); margin-bottom:var(--space-lg);">per project / month</div>
+            <ul style="list-style:none; text-align:left; display:inline-block;">
+              <li style="padding:var(--space-sm) 0; border-bottom:1px solid var(--border-subtle); color:var(--text-primary);">✓ Everything in $79 plan</li>
+              <li style="padding:var(--space-sm) 0; border-bottom:1px solid var(--border-subtle); color:var(--text-primary);">✓ Multi-project discount</li>
+              <li style="padding:var(--space-sm) 0; border-bottom:1px solid var(--border-subtle); color:var(--text-primary);">✓ Dedicated onboarding call</li>
+              <li style="padding:var(--space-sm) 0; color:var(--text-primary);">✓ Priority + phone support</li>
+            </ul>
+            <div style="margin-top:var(--space-lg);">
+              <a href="#waitlist" class="btn" style="width:100%; justify-content:center;">Join waitlist</a>
+            </div>
+          </div>
+        </div>
+        <p style="margin-top:var(--space-xl); font-size:var(--text-label); color:var(--text-hinting); text-align:center;">
+          Early access members get a founding discount. Pricing shown is the target — final pricing may vary.
+        </p>
+      </section>
+
+      <!-- ── Waitlist ───────────────────────────────────────── -->
+      <section class="card featured" id="waitlist">
+        <div class="section-head">
+          <h2>Join the waitlist</h2>
+          <p>
+            We're building ComplianceTrack now. Join the waitlist to get early access, a founding
+            discount, and a direct line to the product team. No spam, no commitments — just early access
+            when we launch.
+          </p>
+        </div>
+        <form id="waitlist-form" style="max-width:480px; margin:0 auto;">
+          <div style="display:grid; gap:var(--space-md); margin-bottom:var(--space-lg);">
+            <label style="display:flex; flex-direction:column; gap:var(--space-xs);">
+              <span style="font-size:var(--text-label); font-weight:500; color:var(--text-secondary);">Full name</span>
+              <input type="text" name="name" required
+                     style="padding:var(--space-sm) var(--space-md); border:1px solid var(--border-subtle); border-radius:var(--radius-md); background:var(--surface); color:var(--text-primary); font-size:var(--text-body); font-family:inherit; min-height:44px;">
+            </label>
+            <label style="display:flex; flex-direction:column; gap:var(--space-xs);">
+              <span style="font-size:var(--text-label); font-weight:500; color:var(--text-secondary);">Email address</span>
+              <input type="email" name="email" required
+                     style="padding:var(--space-sm) var(--space-md); border:1px solid var(--border-subtle); border-radius:var(--radius-md); background:var(--surface); color:var(--text-primary); font-size:var(--text-body); font-family:inherit; min-height:44px;">
+            </label>
+            <label style="display:flex; flex-direction:column; gap:var(--space-xs);">
+              <span style="font-size:var(--text-label); font-weight:500; color:var(--text-secondary);">Company (optional)</span>
+              <input type="text" name="company"
+                     style="padding:var(--space-sm) var(--space-md); border:1px solid var(--border-subtle); border-radius:var(--radius-md); background:var(--surface); color:var(--text-primary); font-size:var(--text-body); font-family:inherit; min-height:44px;">
+            </label>
+            <label style="display:flex; flex-direction:column; gap:var(--space-xs);">
+              <span style="font-size:var(--text-label); font-weight:500; color:var(--text-secondary);">How many projects do you manage? (optional)</span>
+              <select name="projects" style="padding:var(--space-sm) var(--space-md); border:1px solid var(--border-subtle); border-radius:var(--radius-md); background:var(--surface); color:var(--text-primary); font-size:var(--text-body); font-family:inherit; min-height:44px;">
+                <option value="">Select...</option>
+                <option value="1-5">1–5</option>
+                <option value="6-20">6–20</option>
+                <option value="21+">21+</option>
+              </select>
+            </label>
+          </div>
+          <button type="submit" class="btn primary" style="width:100%; justify-content:center;">
+            Join the waitlist
+          </button>
+          <p id="waitlist-status" style="margin-top:var(--space-md); text-align:center; font-size:var(--text-label); min-height:1.4em;"></p>
+        </form>
+      </section>
+
+    </main>
+
+    <!-- ── Footer ──────────────────────────────────────────── -->
+    <footer class="site-footer">
+      <p>ComplianceTrack — Automated vendor compliance &amp; COI tracking for General Contractors</p>
+      <p style="margin-top:var(--space-sm)">Built with Podman Compose &middot; FastAPI &middot; PostgreSQL 16 &middot; Nginx</p>
+      <p style="margin-top:var(--space-md); font-size:var(--text-hinting);">Working title — brand TBD. &copy; 2026</p>
+    </footer>
+
+  </div>
+
+  <script src="/app.js?v=3"></script>
+  <script>
+    // ── Waitlist form handler ──────────────────────────────
+    document.addEventListener('DOMContentLoaded', () => {
+      const form = document.getElementById('waitlist-form');
+      const status = document.getElementById('waitlist-status');
+      if (!form || !status) return;
+
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btn = form.querySelector('button[type="submit"]');
+        const originalText = btn.textContent;
+
+        btn.disabled = true;
+        btn.textContent = 'Submitting…';
+        status.textContent = '';
+        status.style.color = 'var(--text-hinting)';
+
+        try {
+          const formData = new FormData(form);
+          const data = {
+            name:    formData.get('name')    || '',
+            email:   formData.get('email')   || '',
+            company: formData.get('company') || '',
+            projects: formData.get('projects') || '',
+          };
+
+          const resp = await fetch('/api/waitlist', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+          });
+
+          if (resp.ok) {
+            btn.textContent = 'You\'re on the list!';
+            status.textContent = 'Thanks — we\'ll be in touch when we launch.';
+            status.style.color = 'var(--success)';
+            form.reset();
+          } else {
+            btn.textContent = originalText;
+            btn.disabled = false;
+            status.textContent = 'Something went wrong — please try again.';
+            status.style.color = 'var(--error)';
+          }
+        } catch (err) {
+          btn.textContent = originalText;
+          btn.disabled = false;
+          status.textContent = 'Network error — please try again.';
+          status.style.color = 'var(--error)';
+          console.error('Waitlist submit error:', err);
+        }
+      });
+    });
+  </script>
+</body>
+</html>

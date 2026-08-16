@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Local Website — About</title>
+  <meta name="description" content="About the My Local Website project — a Podman Compose stack built as a portable foundation for Kubernetes deployment.">
+
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230a0a0f'/%3E%3Cpath d='M16 6 19.5 13.5 27 16 19.5 18.5 16 26 12.5 18.5 5 16 12.5 13.5z' fill='%23a855f7'/%3E%3C/svg%3E">
+
+  <link rel="stylesheet" href="/style.css?v=2">
+</head>
+<body>
+  <div class="wrapper">
+    <a class="back-link" href="/">← Back to home</a>
+
+    <main>
+      <section class="card featured">
+        <div class="section-head">
+          <h2>About This Project</h2>
+          <p>My Local Website is a personal project built to explore modern web development practices in a local, containerized environment. It started as a simple "let me get a site running in Podman" exercise and grew into a full stack that mirrors what a production deployment would look like.</p>
+          <p>The philosophy is straightforward: build it right locally, and deploying it for real becomes a boring, mechanical step instead of a rewrite. That means containers with resource limits, TLS from day one, a backend that checks its own health, and configuration that maps 1:1 to Kubernetes manifests.</p>
+        </div>
+      </section>
+
+      <div class="about-grid">
+        <section class="about-section">
+          <h2>The Stack</h2>
+          <p>Nginx handles TLS and static file serving, proxying API requests to the backend. The FastAPI service is written in Python 3.11 and connects to PostgreSQL using psycopg2. The database runs PostgreSQL 16 on Alpine Linux, kept lean and focused.</p>
+          <p>Everything communicates over a private Podman network. No service is exposed to the host unless it needs to be — the backend's port is mapped only so health checks can reach it during verification.</p>
+        </section>
+
+        <section class="about-section">
+          <h2>The Infrastructure</h2>
+          <p>Podman 4.9 runs rootless on Kubuntu 24.04. The entire stack is defined in a single <code>compose.yaml</code> file, with environment variables pulled from a <code>.env</code> file that's gitignored. A systemd user service brings the stack up automatically on login.</p>
+          <p>TLS certificates are generated with mkcert, which creates a local CA trusted by the system and by browsers. The certificate is installed into both the system trust store and the NSS database, so Firefox, Brave, and Chromium all treat the site as secure.</p>
+        </section>
+
+        <section class="about-section">
+          <h2>The Path to Production</h2>
+          <p>When it's time to deploy, the compose file translates directly into Kubernetes resources: the nginx service becomes a Deployment plus an Ingress, the backend becomes a Deployment with a ClusterIP Service, and PostgreSQL becomes a StatefulSet with a persistent volume claim.</p>
+          <p>Resource limits, environment variables, health checks, and volume mounts are all already defined — the Kubernetes manifests will mostly be a reformatting exercise. The real work is setting up the ingress controller, the cluster's certificate management, and the persistent storage backend.</p>
+        </section>
+
+        <section class="about-section">
+          <h2>Design Choices</h2>
+          <p>The site uses a dark theme aligned with Material Design 3 conventions: tonal surfaces for depth, an opacity-based text hierarchy (primary at 87%, secondary at 60%, hinting at 40%), and consistent spacing and type scales. The purple accent comes from the palette of the original reference image — it's the project's brand color.</p>
+          <p>Responsive design is handled with CSS <code>clamp()</code> functions and CSS Grid, so the layout adapts smoothly from phone screens to desktop monitors without media query breakpoints. Every interactive element meets the 44px minimum touch target size for mobile accessibility.</p>
+        </section>
+      </div>
+
+      <section class="card">
+        <div class="section-head">
+          <h2>What's Next</h2>
+          <p>The immediate next steps are tightening up the website itself — making it look polished enough to deploy publicly — and then mapping the compose stack into actual Kubernetes manifests. After that, it's a matter of picking a host, setting up the cluster, and flipping the switch.</p>
+          <p>Longer term, the plan is to add more backend functionality: real data models, authentication, a deployment pipeline, and whatever else a live site needs. The foundation is already solid. The rest is just building on top of it.</p>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <p>HTTPS via mkcert local CA &middot; <code>https://localhost:8443</code></p>
+    </footer>
+  </div>
+</body>
+</html>
