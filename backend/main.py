@@ -5,9 +5,6 @@ import os, socket, psycopg2, psycopg2.extras, time
 
 app = FastAPI()
 
-# Serve static files from /app/html/ at the root
-app.mount("/", StaticFiles(directory="/app/html", html=True), name="static")
-
 DB_HOST = os.getenv("DB_HOST", "db")
 DB_USER = os.getenv("POSTGRES_USER", "myuser")
 DB_PASS = os.getenv("POSTGRES_PASSWORD", "mypassword")
@@ -20,18 +17,10 @@ def get_db():
     )
 
 
-@app.get("/")
-async def root():
-    return {
-        "message": "Hello from the FastAPI backend!",
-        "service": "backend",
-        "hostname": socket.gethostname(),
-    }
+# ── API routes (registered first so they take priority over static mount) ──
 
-
-@app.get("/health")
-async def health():
-    """Liveness + readiness check. Returns 200 only when DB is reachable."""
+@app.get("/api/health")
+async def api_health():
     db_ok = False
     db_version = None
     db_latency_ms = None
@@ -45,9 +34,8 @@ async def health():
         conn.close()
         db_ok = True
         db_latency_ms = round((time.monotonic() - start) * 1000, 1)
-    except Exception as e:
-        db_version = None
-        db_latency_ms = None
+    except Exception:
+        pass
 
     status = "healthy" if db_ok else "degraded"
     return {
@@ -60,8 +48,8 @@ async def health():
     }
 
 
-@app.get("/db-check")
-async def db_check():
+@app.get("/api/db-check")
+async def api_db_check():
     try:
         conn = get_db()
         cur = conn.cursor()
@@ -87,8 +75,8 @@ async def db_check():
         }
 
 
-@app.get("/db-items")
-async def db_items():
+@app.get("/api/db-items")
+async def api_db_items():
     try:
         conn = get_db()
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
@@ -111,9 +99,8 @@ async def db_items():
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/db-seed")
-async def db_seed():
-    """Seed the items table with sample data. Idempotent — safe to call repeatedly."""
+@app.post("/api/db-seed")
+async def api_db_seed():
     sample_items = [
         "Podman Compose Stack",
         "Nginx Reverse Proxy",
@@ -126,7 +113,6 @@ async def db_seed():
         conn = get_db()
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
-        # Ensure table exists
         cur.execute(
             """
             CREATE TABLE IF NOT EXISTS items (
@@ -137,7 +123,6 @@ async def db_seed():
             """
         )
 
-        # Insert only if not already present
         inserted = 0
         for name in sample_items:
             cur.execute(
@@ -161,9 +146,8 @@ async def db_seed():
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/waitlist")
-async def waitlist_signup(data: dict):
-    """Capture a waitlist signup. Stores name, email, company, and project count."""
+@app.post("/api/waitlist")
+async def api_waitlist(data: dict):
     name = (data.get("name") or "").strip()
     email = (data.get("email") or "").strip().lower()
     company = (data.get("company") or "").strip()
@@ -215,3 +199,8 @@ async def waitlist_signup(data: dict):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ── Static files ────────────────────────────────────────────────────────────
+# Mounted AFTER API routes so API paths take priority.
+app.mount("/", StaticFiles(directory="/app/html", html=True), name="static")
