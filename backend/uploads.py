@@ -1,26 +1,23 @@
 import os
 import uuid
 import asyncio
-from fastapi import APIRouter, UploadFile, File, HTTPException, BackgroundTasks, Request
-from typing import Optional
+from fastapi import APIRouter, UploadFile, File, HTTPException, BackgroundTasks
 
 router = APIRouter(prefix="/api/v1", tags=["uploads"])
 
 UPLOAD_DIR = "uploaded_cois"
 MAX_FILE_SIZE = 25 * 1024 * 1024  # 25MB cap for COI PDFs
 
-# ── Reuse existing DB helper from main.py ──────────────────────────────────
-try:
-    from main import get_db
-except ImportError:
-    import psycopg2, os
-    def get_db():
-        return psycopg2.connect(
-            host=os.getenv("DB_HOST", "db"),
-            user=os.getenv("POSTGRES_USER", "myuser"),
-            password=os.getenv("POSTGRES_PASSWORD", "mypassword"),
-            dbname=os.getenv("POSTGRES_DB", "myapp"),
-        )
+# ── DB helper (self-contained, no circular import with main.py) ────────────
+import psycopg2, os
+
+def get_db():
+    return psycopg2.connect(
+        host=os.getenv("DB_HOST", "db"),
+        user=os.getenv("POSTGRES_USER", "myuser"),
+        password=os.getenv("POSTGRES_PASSWORD", "mypassword"),
+        dbname=os.getenv("POSTGRES_DB", "myapp"),
+    )
 
 
 # ── Async email dispatch (runs in background AFTER response) ──────────────
