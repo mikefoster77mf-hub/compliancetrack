@@ -2,10 +2,18 @@
 
 Runs daily to find COIs expiring within the user's configured window
 and sends reminder emails via Resend (preferred) or SMTP fallback.
+
+Date arithmetic is done per-user in their configured timezone so that
+"today" and the expiry cutoff reflect when the user actually perceives
+a deadline — not the server's clock and not UTC.
+
+Requires each user to have a `timezone` column on the users table.
+Defaults to UTC when the column is missing or empty.
 """
 
 import os
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 import psycopg2
 import psycopg2.extras
 
@@ -19,20 +27,42 @@ def get_db():
     )
 
 
+def utc_today():
+    """Return today's date in UTC (server's reference clock)."""
+    return datetime.now(timezone.utc).date()
+
+
+def user_today_in_timezone(tz_name: str) -> date:
+    """Return today's date as the user would see it in their local timezone.
+
+    "today" in the user's TZ is the calendar day that contains the current
+    instant in that zone — the right anchor for "how many days until expiry"
+    from the user's perspective.
+    """
+    try:
+        tz = ZoneInfo(tz_name)
+    except Exception:
+        tz = timezone.utc
+    return datetime.now(tz).date()
+
+
 def check_and_send():
     """Find COIs expiring soon and send reminder emails.
 
     Called once per day by the scheduler (or manually for testing).
+    For each user we compute "today" in their own timezone so that a COI
+    expiring on the Nth calendar day from now is picked up regardless of
+    where the user is located.
     """
     conn = get_db()
     cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
-    today = date.today()
-
-    # Get all users with reminder settings
+    # ── Grab reminder settings per user, including their timezone ────────
+    # Assumes users.timezone holds an IANA zone name like "America/New_York".
+    # Falls back to UTC per-row when the column is NULL/empty.
     cur.execute(
         """
-        SELECT u.id, u.email, u.name, u.password_hash,
+        SELECT u.id, u.email, u.name, u.timezone,
                rs.days_before_expiry, rs.email_enabled
         FROM users u
         JOIN reminder_settings rs ON u.id = rs.user_id
@@ -42,13 +72,19 @@ def check_and_send():
     users = cur.fetchall()
 
     for user in users:
+        tz_name = user["timezone"] or "UTC"
+        today = user_today_in_timezone(tz_name)
         days_before = user["days_before_expiry"]
         cutoff = today + timedelta(days=days_before)
 
-        # Find COIs for this user expiring within the window
+        # ── COIs whose expiring_date (DATE, no TZ) falls in [today, cutoff]
+        # expiring_date is a calendar date. Comparing against a date computed
+        # in the user's TZ means "today" means the user's today, so the
+        # 60/30/7-day window is anchored correctly for that user.
         cur.execute(
             """
-            SELECT c.id, c.vendor_id, c.insurance_type, c.expiring_date,
+            SELECT c.id, c.vendor_id, c.pdf_filename AS insurance_type,
+                   c.expiring_date,
                    v.name AS vendor_name
             FROM cois c
             JOIN vendors v ON c.vendor_id = v.id
@@ -56,6 +92,7 @@ def check_and_send():
               AND c.expiring_date IS NOT NULL
               AND c.expiring_date >= %s
               AND c.expiring_date <= %s
+              AND c.archived = FALSE
             ORDER BY c.expiring_date;
             """,
             (user["id"], today, cutoff),
@@ -94,17 +131,19 @@ def send_reminder_email(to_email, user_name, vendor_name, insurance_type, expiri
     if api_key:
         try:
             import resend
+
             resend.api_key = api_key
-            resend.Emails.send({
-                "from": "ComplianceTrack <onboarding@resend.dev>",
-                "to": [to_email],
-                "subject": subject,
-                "text": body,
-            })
+            resend.Emails.send(
+                {
+                    "from": "ComplianceTrack <onboarding@resend.dev>",
+                    "to": [to_email],
+                    "subject": subject,
+                    "text": body,
+                }
+            )
         except Exception as e:
             print(f"Resend email failed for {to_email}: {e}")
     else:
-        # SMTP fallback
         smtp_host = os.getenv("SMTP_HOST")
         smtp_port = int(os.getenv("SMTP_PORT", "587"))
         smtp_user = os.getenv("SMTP_USER")
@@ -113,6 +152,7 @@ def send_reminder_email(to_email, user_name, vendor_name, insurance_type, expiri
             try:
                 import smtplib
                 from email.message import EmailMessage
+
                 msg = EmailMessage()
                 msg["Subject"] = subject
                 msg["From"] = "ComplianceTrack <noreply@compliancetrack.app>"
@@ -125,4 +165,6 @@ def send_reminder_email(to_email, user_name, vendor_name, insurance_type, expiri
             except Exception as e:
                 print(f"SMTP email failed for {to_email}: {e}")
         else:
-            print(f"No email backend configured. Would have sent to {to_email}: {subject}")
+            print(
+                f"No email backend configured. Would have sent to {to_email}: {subject}"
+            )

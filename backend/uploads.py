@@ -29,7 +29,7 @@ class VendorModel(Base):
     notes: Mapped[str] = mapped_column(String, default="")
     created_at: Mapped[DateTime] = mapped_column(DateTime, nullable=True)
     updated_at: Mapped[DateTime] = mapped_column(DateTime, nullable=True)
-    # ── Columns needed by the upload endpoint (add to DB if not present) ──
+    # ── Columns needed by the upload endpoint ───────────────────────────────
     magic_token: Mapped[str | None] = mapped_column(String, unique=True, nullable=True)
 
 
@@ -39,8 +39,8 @@ class CoiModel(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     vendor_id: Mapped[int] = mapped_column(Integer, nullable=False)
     user_id: Mapped[int] = mapped_column(Integer, nullable=False)
-    # ── Existing column uses BYTEA for the PDF binary; upload endpoint also ─
-    # ── writes to disk, so we track the file path separately.                ─
+    # ── Existing column uses BYTEA for the PDF binary ───────────────────────
+    # ── upload endpoint also writes to disk, so we track the path separately ─
     pdf_data: Mapped[bytes | None] = mapped_column(Text, nullable=True)  # BYTEA→Text placeholder
     pdf_filename: Mapped[str] = mapped_column(String, default="")
     insurance_type: Mapped[str] = mapped_column(String, default="")
@@ -49,10 +49,11 @@ class CoiModel(Base):
     notes: Mapped[str] = mapped_column(String, default="")
     created_at: Mapped[DateTime] = mapped_column(DateTime, nullable=True)
     updated_at: Mapped[DateTime] = mapped_column(DateTime, nullable=True)
-    # ── Columns needed by the upload endpoint (add to DB if not present) ──
+    # ── Columns needed by the upload endpoint ───────────────────────────────
     pdf_path: Mapped[str | None] = mapped_column(String, nullable=True)
     status: Mapped[str | None] = mapped_column(String, nullable=True)
     notified_email: Mapped[str | None] = mapped_column(String, nullable=True)
+    archived: Mapped[bool] = mapped_column(default=False)  # True = superseded by newer version
 
 
 # ── Async email dispatch (runs in background AFTER response) ──────────────
@@ -91,17 +92,18 @@ async def upload_coi_document(
     vendor_id, vendor_user_id, vendor_email, vendor_name = vendor
 
     # 3. Secure async file write — atomic tmp + rename, 1MB chunks
+    #    Write to tmp FIRST so we don't lose the old file if the write fails.
     file_ext = os.path.splitext(file.filename)[1]  # always .pdf here
-    unique_name = f"{uuid.uuid4()}{file_ext}"
-    tmp_path = os.path.join(UPLOAD_DIR, f"{uuid.uuid4()}.pdf.tmp")
-    final_path = os.path.join(UPLOAD_DIR, unique_name)
+    new_uuid = uuid.uuid4()
+    new_tmp_path = os.path.join(UPLOAD_DIR, f"{new_uuid}.pdf.tmp")
+    new_final_path = os.path.join(UPLOAD_DIR, f"{new_uuid}{file_ext}")
 
     os.makedirs(UPLOAD_DIR, exist_ok=True)  # one-time, fast, sync is fine
 
     bytes_written = 0
     try:
         import aiofiles
-        async with aiofiles.open(tmp_path, "wb") as buf:
+        async with aiofiles.open(new_tmp_path, "wb") as buf:
             while chunk := await file.read(1024 * 1024):  # 1MB chunks
                 bytes_written += len(chunk)
                 if bytes_written > MAX_FILE_SIZE:
@@ -110,45 +112,74 @@ async def upload_coi_document(
                         detail=f"File exceeds {MAX_FILE_SIZE // (1024*1024)}MB limit",
                     )
                 await buf.write(chunk)
-        # Atomic rename — partial files are never visible at final_path
-        os.replace(tmp_path, final_path)
+        # Atomic rename — partial files are never visible at new_final_path
+        os.replace(new_tmp_path, new_final_path)
     except HTTPException:
         # Clean up partial tmp file on size-exceeded abort
-        if os.path.exists(tmp_path):
-            os.remove(tmp_path)
+        if os.path.exists(new_tmp_path):
+            os.remove(new_tmp_path)
         raise
     except Exception as e:
         # Clean up on any write failure
-        if os.path.exists(tmp_path):
-            os.remove(tmp_path)
-        if os.path.exists(final_path):
-            os.remove(final_path)
+        if os.path.exists(new_tmp_path):
+            os.remove(new_tmp_path)
+        if os.path.exists(new_final_path):
+            os.remove(new_final_path)
         raise HTTPException(status_code=500, detail=f"File storage failed: {e}")
 
-    # 4. DB status update — native async SQLAlchemy insert
-    await db.execute(
-        insert(CoiModel).values(
-            vendor_id=vendor_id,
-            user_id=vendor_user_id,  # owner of the vendor (from token lookup)
-            pdf_path=final_path,
-            pdf_filename=file.filename,
-            status="GREEN",
-            notified_email=vendor_email,
-            created_at=func.now(),
-        )
+    # 4. Archive the old active COI record for this vendor (if one exists)
+    #    We do this BEFORE committing the new insert so the old record is
+    #    safely superseded even if something fails after.
+    old_coi_result = await db.execute(
+        select(CoiModel).where(
+            CoiModel.vendor_id == vendor_id,
+            CoiModel.archived == False,
+        ).order_by(CoiModel.created_at.desc())
     )
-    await db.commit()  # explicit commit — get_async_db also commits on yield, but we need it now
+    old_coi = old_coi_result.scalar_one_or_none()
 
-    # 5. Background email — fires AFTER the HTTP response is sent back to user
+    old_pdf_path = None
+    if old_coi:
+        # Archive record: mark superseded, keep for audit trail
+        old_coi.archived = True
+        old_pdf_path = old_coi.pdf_path  # remember path so we can delete the file
+
+    # 5. Insert the new COI record as the active version
+    new_coi = CoiModel(
+        vendor_id=vendor_id,
+        user_id=vendor_user_id,  # owner of the vendor (from token lookup)
+        pdf_path=new_final_path,
+        pdf_filename=file.filename,
+        status="GREEN",
+        notified_email=vendor_email,
+        created_at=func.now(),
+        archived=False,
+    )
+    db.add(new_coi)
+    await db.flush()  # get the new id without committing yet
+
+    # 6. Delete the old PDF file from storage (if one existed)
+    #    Safe to do after flush — old_coi is archived, new_coi is persisted.
+    if old_pdf_path and os.path.exists(old_pdf_path):
+        try:
+            os.remove(old_pdf_path)
+        except OSError:
+            # Log but don't fail the upload — stale file on disk is not critical
+            print(f"[warn] Could not delete old PDF: {old_pdf_path}")
+
+    await db.commit()  # commit both the archive flag and the new insert
+
+    # 7. Background email — fires AFTER the HTTP response is sent back to user
     background_tasks.add_task(
         send_async_email_notification,
         vendor_email=vendor_email,
         doc_name=file.filename,
     )
 
-    # 6. Immediate response — user gets this right away; email/db work continues
+    # 8. Immediate response — user gets this right away; email work continues
     return {
         "status": "success",
         "message": "Certificate uploaded successfully. Processing in background.",
-        "filename": unique_name,
+        "filename": os.path.basename(new_final_path),
+        "replaced": old_coi is not None,
     }

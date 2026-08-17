@@ -285,13 +285,14 @@ async def api_auth_signup(data: dict):
                 email TEXT NOT NULL UNIQUE,
                 password_hash TEXT NOT NULL,
                 name TEXT NOT NULL DEFAULT '',
+                timezone TEXT DEFAULT 'UTC',
                 created_at TIMESTAMPTZ DEFAULT NOW()
             );
             """
         )
 
         cur.execute(
-            "INSERT INTO users (email, password_hash, name) VALUES (%s, %s, %s) RETURNING id, email, name;",
+            "INSERT INTO users (email, password_hash, name, timezone) VALUES (%s, %s, %s, 'UTC') RETURNING id, email, name, timezone;",
             (email, hashed, name),
         )
         row = cur.fetchone()
@@ -299,7 +300,7 @@ async def api_auth_signup(data: dict):
         conn.commit()
         conn.close()
 
-        return {"id": row["id"], "email": row["email"], "name": row["name"]}
+        return {"id": row["id"], "email": row["email"], "name": row["name"], "timezone": row["timezone"]}
     except psycopg2.errors.UniqueViolation:
         raise HTTPException(status_code=409, detail="An account with this email already exists.")
     except Exception as e:
@@ -680,7 +681,8 @@ async def api_cois(request: Request, vendor_id: int | None = None):
                 updated_at TIMESTAMPTZ DEFAULT NOW(),
                 pdf_path TEXT DEFAULT NULL,
                 status TEXT DEFAULT NULL,
-                notified_email TEXT DEFAULT NULL
+                notified_email TEXT DEFAULT NULL,
+                archived BOOLEAN DEFAULT FALSE
             );
             """
         )
@@ -783,7 +785,8 @@ async def api_cois_create(
                 updated_at TIMESTAMPTZ DEFAULT NOW(),
                 pdf_path TEXT DEFAULT NULL,
                 status TEXT DEFAULT NULL,
-                notified_email TEXT DEFAULT NULL
+                notified_email TEXT DEFAULT NULL,
+                archived BOOLEAN DEFAULT FALSE
             );
             """
         )
@@ -943,7 +946,8 @@ async def api_dashboard(request: Request):
                 updated_at TIMESTAMPTZ DEFAULT NOW(),
                 pdf_path TEXT DEFAULT NULL,
                 status TEXT DEFAULT NULL,
-                notified_email TEXT DEFAULT NULL
+                notified_email TEXT DEFAULT NULL,
+                archived BOOLEAN DEFAULT FALSE
             );
             """
         )
