@@ -10,7 +10,9 @@ RUN pip install --no-cache-dir bcrypt itsdangerous jinja2 python-multipart fasta
 COPY backend/main.py .
 COPY backend/scheduler.py .
 COPY backend/reminders.py .
+# Force fresh copy of HTML on every build (busts Docker layer cache on Render)
 COPY html/ /app/html/
+COPY .git/HEAD /app/.git-head
 
 EXPOSE 8000
 
