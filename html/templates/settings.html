@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+
+{% block title %}Settings — ComplianceTrack{% endblock %}
+
+{% block content %}
+<div style="max-width:500px; margin:0 auto;">
+  <h2 style="margin-bottom:var(--space-lg);">Reminder settings</h2>
+  <p style="color:var(--text-secondary); margin-bottom:var(--space-lg); font-size:var(--text-label);">
+    Receive email reminders when certificates are about to expire.
+  </p>
+
+  <form id="settings-form" style="display:flex; flex-direction:column; gap:var(--space-md);">
+    <label>
+      Remind me <span style="color:var(--error);">*</span>
+      <div style="display:flex; align-items:center; gap:var(--space-sm);">
+        <input type="number" id="days-input" name="days_before_expiry" min="1" max="365"
+          style="width:80px; padding:var(--space-sm) var(--space-md); border:1px solid var(--border-subtle); border-radius:var(--radius-md); background:var(--surface-elevated); color:var(--text-primary); font-size:inherit;">
+        <span style="color:var(--text-secondary);">days before expiration</span>
+      </div>
+    </label>
+
+    <label style="display:flex; align-items:center; gap:var(--space-sm); cursor:pointer;">
+      <input type="checkbox" id="email-toggle" name="email_enabled" style="width:18px; height:18px; accent-color:var(--accent-primary);">
+      <span style="font-size:var(--text-title);">Enable email reminders</span>
+    </label>
+
+    <div style="display:flex; gap:var(--space-md);">
+      <button type="submit" class="btn primary" style="flex:1; justify-content:center;">
+        Save settings
+      </button>
+      <a href="/dashboard" style="color:var(--text-secondary); text-decoration:underline;">Cancel</a>
+    </div>
+
+    <p id="settings-status" style="margin-top:var(--space-md); text-align:center; font-size:var(--text-label); min-height:1.4em;"></p>
+  </form>
+
+  {% if settings %}
+    <div class="card" style="margin-top:var(--space-lg); padding:var(--space-md); background:var(--surface-elevated); border-color:var(--border-subtle);">
+      <p style="font-size:var(--text-label); color:var(--text-hinting);">
+        Currently: Remind me <strong>{{ settings.days_before_expiry }}</strong> days before. Email reminders are <strong>{{ 'disabled' if not settings.email_enabled else 'enabled' }}</strong>.
+      </p>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const form = document.getElementById('settings-form');
+  const status = document.getElementById('settings-status');
+  if (!form || !status) return;
+
+  // Load current settings
+  fetch('/api/settings', { credentials: 'same-origin' })
+    .then(r => r.json())
+    .then(data => {
+      document.getElementById('days-input').value = data.days_before_expiry;
+      document.getElementById('email-toggle').checked = data.email_enabled;
+    })
+    .catch(() => {});
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = form.querySelector('button[type="submit"]');
+    const originalText = btn.textContent;
+
+    btn.disabled = true;
+    btn.textContent = 'Saving…';
+    status.textContent = '';
+    status.style.color = 'var(--text-hinting)';
+
+    const daysInput = document.getElementById('days-input');
+    const emailToggle = document.getElementById('email-toggle');
+    const data = {
+      days_before_expiry: parseInt(daysInput.value) || 30,
+      email_enabled: emailToggle.checked,
+    };
+
+    try {
+      const resp = await fetch('/api/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+        credentials: 'same-origin',
+      });
+
+      const result = await resp.json();
+
+      if (resp.ok) {
+        status.textContent = 'Settings saved.';
+        status.style.color = 'var(--success)';
+        btn.textContent = originalText;
+        btn.disabled = false;
+      } else {
+        btn.textContent = originalText;
+        btn.disabled = false;
+        status.textContent = result.detail || 'Failed to save settings.';
+        status.style.color = 'var(--error)';
+      }
+    } catch (err) {
+      btn.textContent = originalText;
+      btn.disabled = false;
+      status.textContent = 'Network error — please try again.';
+      status.style.color = 'var(--error)';
+    }
+  });
+});
+</script>
+{% endblock %}

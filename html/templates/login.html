@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+
+{% block title %}Log in — ComplianceTrack{% endblock %}
+
+{% block content %}
+<section class="card" style="max-width:420px; margin:0 auto;">
+  <h2 style="margin-bottom:var(--space-lg);">Log in</h2>
+  <form id="login-form" style="display:flex; flex-direction:column; gap:var(--space-md);">
+    <label>
+      Email
+      <input type="email" name="email" required
+        style="width:100%; padding:var(--space-sm) var(--space-md); border:1px solid var(--border-subtle); border-radius:var(--radius-md); background:var(--surface-elevated); color:var(--text-primary); font-size:inherit;"
+        placeholder="you@example.com">
+    </label>
+    <label>
+      Password
+      <input type="password" name="password" required
+        style="width:100%; padding:var(--space-sm) var(--space-md); border:1px solid var(--border-subtle); border-radius:var(--radius-md); background:var(--surface-elevated); color:var(--text-primary); font-size:inherit;"
+        placeholder="At least 8 characters">
+    </label>
+    <button type="submit" class="btn primary" style="width:100%; justify-content:center;">
+      Log in
+    </button>
+    <p style="text-align:center; font-size:var(--text-label); margin-top:var(--space-sm);">
+      New here? <a href="/signup" style="color:var(--accent-primary);">Sign up</a>
+    </p>
+  </form>
+  <p id="login-status" style="margin-top:var(--space-md); text-align:center; font-size:var(--text-label); min-height:1.4em;"></p>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const form = document.getElementById('login-form');
+  const status = document.getElementById('login-status');
+  if (!form || !status) return;
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = form.querySelector('button[type="submit"]');
+    const originalText = btn.textContent;
+
+    btn.disabled = true;
+    btn.textContent = 'Logging in…';
+    status.textContent = '';
+    status.style.color = 'var(--text-hinting)';
+
+    const formData = new FormData(form);
+    const data = {
+      email: formData.get('email') || '',
+      password: formData.get('password') || '',
+    };
+
+    try {
+      const resp = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+        credentials: 'same-origin',
+      });
+
+      const result = await resp.json();
+
+      if (resp.ok) {
+        window.location.href = '/dashboard';
+      } else {
+        btn.textContent = originalText;
+        btn.disabled = false;
+        status.textContent = result.detail || 'Login failed — please try again.';
+        status.style.color = 'var(--error)';
+      }
+    } catch (err) {
+      btn.textContent = originalText;
+      btn.disabled = false;
+      status.textContent = 'Network error — please try again.';
+      status.style.color = 'var(--error)';
+    }
+  });
+});
+</script>
+{% endblock %}

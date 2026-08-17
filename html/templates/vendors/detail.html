@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+
+{% block title %}{{ vendor.name }} — ComplianceTrack{% endblock %}
+
+{% block content %}
+<div style="display:flex; gap:var(--space-lg); margin-bottom:var(--space-xl); flex-wrap:wrap; align-items:start;">
+  <div style="flex:1; min-width:250px;">
+    <div class="card" style="padding:var(--space-lg);">
+      <div style="display:flex; justify-content:space-between; align-items:start; margin-bottom:var(--space-md);">
+        <h2 style="margin:0; font-size:var(--text-title);">{{ vendor.name }}</h2>
+        <div style="display:flex; gap:var(--space-sm);">
+          <a href="/vendors/{{ vendor.id }}/edit" style="background:none; border:none; color:var(--accent-primary); cursor:pointer; font-size:inherit; text-decoration:underline; padding:var(--space-xs);">Edit</a>
+          <button id="delete-vendor-btn" style="background:none; border:none; color:var(--error); cursor:pointer; font-size:inherit; text-decoration:underline; padding:var(--space-xs);">Delete</button>
+        </div>
+      </div>
+      {% if vendor.email %}<p style="color:var(--text-secondary); margin-bottom:var(--space-xs);">{{ vendor.email }}</p>{% endif %}
+      {% if vendor.phone %}<p style="color:var(--text-hinting); margin-bottom:var(--space-xs);">{{ vendor.phone }}</p>{% endif %}
+      {% if vendor.address %}<p style="color:var(--text-hinting); margin-bottom:var(--space-xs);">{{ vendor.address }}</p>{% endif %}
+      {% if vendor.notes %}<p style="color:var(--text-secondary); font-size:var(--text-label); margin-top:var(--space-md);">{{ vendor.notes }}</p>{% endif %}
+      <p style="color:var(--text-hinting); font-size:var(--text-label); margin-top:var(--space-md); border-top:1px solid var(--border-subtle); padding-top:var(--space-sm);">Created {{ vendor.created_at.strftime('%Y-%m-%d %H:%M') if vendor.created_at else '—' }}</p>
+    </div>
+  </div>
+</div>
+
+<div style="display:flex; gap:var(--space-lg); flex-wrap:wrap;">
+  <a href="/vendors/{{ vendor.id }}/cois" class="btn primary">Manage COIs</a>
+  <a href="/vendors/{{ vendor.id }}/cois/add" class="btn" style="background:var(--surface-elevated); color:var(--text-primary); border:1px solid var(--border-subtle);">Upload COI</a>
+  <a href="/vendors" style="color:var(--text-secondary); text-decoration:underline;">← Back to vendors</a>
+</div>
+
+<section class="card" style="margin-top:var(--space-xl);">
+  <h3 style="margin-bottom:var(--space-md);">Certificates of Insurance</h3>
+  <div id="coi-list">
+    <p style="color:var(--text-hinting);">Loading…</p>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', async () => {
+  const coiList = document.getElementById('coi-list');
+  const deleteBtn = document.getElementById('delete-vendor-btn');
+  const vendorId = {{ vendor.id }};
+
+  // Load COIs
+  try {
+    const resp = await fetch(`/api/cois?vendor_id=${vendorId}`, { credentials: 'same-origin' });
+    const data = await resp.json();
+
+    if (data.cois && data.cois.length > 0) {
+      coiList.innerHTML = data.cois.map(coi => {
+        const statusColor = coi.expiring_date ?
+          (new Date(coi.expiring_date) < new Date() ? 'var(--error)' :
+           (new Date(coi.expiring_date) < new Date(Date.now() + 30*24*60*60*1000) ? 'var(--warning)' : 'var(--success)')) :
+          'var(--text-hinting)';
+        const statusText = coi.expiring_date ?
+          (new Date(coi.expiring_date) < new Date() ? 'Expired' :
+           (new Date(coi.expiring_date) < new Date(Date.now() + 30*24*60*60*1000) ? 'Expiring soon' : 'Valid')) :
+          'No date';
+        return `
+          <div class="card" style="padding:var(--space-md); margin-bottom:var(--space-sm); border-left:3px solid ${statusColor};">
+            <div style="display:flex; justify-content:space-between; align-items:start;">
+              <div>
+                <p style="font-weight:700; margin-bottom:var(--space-xs);">${coi.insurance_type || 'COI'}</p>
+                <p style="font-size:var(--text-label); color:${statusColor};">Expires ${coi.expiring_date ? new Date(coi.expiring_date).toLocaleDateString() : '—'} — ${statusText}</p>
+                ${coi.notes ? `<p style="font-size:var(--text-hinting); margin-top:var(--space-xs);">${coi.notes}</p>` : ''}
+              </div>
+              <div style="display:flex; gap:var(--space-xs);">
+                <a href="/api/cois/${coi.id}/download" download style="background:none; border:none; color:var(--accent-primary); cursor:pointer; font-size:var(--text-label); text-decoration:underline; padding:var(--space-xs); white-space:nowrap;">Download</a>
+                <button data-coi-id="${coi.id}" style="background:none; border:none; color:var(--error); cursor:pointer; font-size:var(--text-label); text-decoration:underline; padding:var(--space-xs); white-space:nowrap;">Delete</button>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    } else {
+      coiList.innerHTML = '<p style="color:var(--text-hinting);">No COIs uploaded yet. <a href="/vendors/' + vendorId + '/cois/add" style="color:var(--accent-primary);">Upload one</a></p>';
+    }
+  } catch (err) {
+    coiList.innerHTML = '<p style="color:var(--error);">Failed to load COIs.</p>';
+  }
+
+  // Delete vendor
+  if (deleteBtn) {
+    deleteBtn.addEventListener('click', async () => {
+      if (!confirm('Delete this vendor and all their COIs? This cannot be undone.')) return;
+      try {
+        const resp = await fetch(`/api/vendors/${vendorId}`, { method: 'DELETE', credentials: 'same-origin' });
+        if (resp.ok) {
+          window.location.href = '/vendors';
+        } else {
+          alert('Failed to delete vendor.');
+        }
+      } catch (err) {
+        alert('Network error.');
+      }
+    });
+  }
+
+  // Delete COI buttons
+  document.querySelectorAll('[data-coi-id]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const coiId = btn.getAttribute('data-coi-id');
+      if (!confirm('Delete this certificate?')) return;
+      try {
+        const resp = await fetch(`/api/cois/${coiId}`, { method: 'DELETE', credentials: 'same-origin' });
+        if (resp.ok) {
+          window.location.reload();
+        } else {
+          alert('Failed to delete COI.');
+        }
+      } catch (err) {
+        alert('Network error.');
+      }
+    });
+  });
+});
+</script>
+{% endblock %}

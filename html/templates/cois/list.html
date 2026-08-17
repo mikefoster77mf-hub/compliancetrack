@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% block title %}Certificates — {{ vendor_name }} — ComplianceTrack{% endblock %}
+
+{% block content %}
+<div style="display:flex; gap:var(--space-lg); margin-bottom:var(--space-xl); flex-wrap:wrap; align-items:start;">
+  <div>
+    <h2 style="margin:0;">Certificates of Insurance</h2>
+    <p style="color:var(--text-secondary); margin-top:var(--space-xs); font-size:var(--text-label);">{{ vendor_name }}</p>
+  </div>
+  <a href="/vendors/{{ vendor_id }}/cois/add" class="btn primary">Upload COI</a>
+  <a href="/vendors/{{ vendor_id }}" style="color:var(--text-secondary); text-decoration:underline;">← Back to vendor</a>
+</div>
+
+{% if cois %}
+  <div style="display:grid; gap:var(--space-md); grid-template-columns:repeat(auto-fit, minmax(300px,1fr));">
+    {% for coi in cois %}
+      <div class="card" style="padding:var(--space-lg); border-left:4px solid {{ coi.status_color }};">
+        <div style="display:flex; justify-content:space-between; align-items:start;">
+          <div>
+            <h3 style="margin:0 0 var(--space-sm) 0; font-size:var(--text-title);">{{ coi.insurance_type or 'Certificate of Insurance' }}</h3>
+            {% if coi.expiring_date %}<p style="color:var(--text-secondary); font-size:var(--text-label); margin-bottom:var(--space-xs);">Expires {{ coi.expiring_date }}</p>{% endif %}
+            {% if coi.issued_date %}<p style="color:var(--text-hinting); font-size:var(--text-label); margin-bottom:var(--space-xs);">Issued {{ coi.issued_date }}</p>{% endif %}
+            {% if coi.notes %}<p style="color:var(--text-secondary); font-size:var(--text-label); margin-top:var(--space-sm);">{{ coi.notes }}</p>{% endif %}
+          </div>
+          <div style="display:flex; gap:var(--space-xs); flex-shrink:0;">
+            {% if coi.pdf_data %}
+              <a href="/api/cois/{{ coi.id }}/download" download style="background:none; border:none; color:var(--accent-primary); cursor:pointer; font-size:var(--text-label); text-decoration:underline; padding:var(--space-xs); white-space:nowrap;">Download</a>
+            {% endif %}
+            <button data-coi-id="{{ coi.id }}" style="background:none; border:none; color:var(--error); cursor:pointer; font-size:var(--text-label); text-decoration:underline; padding:var(--space-xs); white-space:nowrap;">Delete</button>
+          </div>
+        </div>
+        <p style="color:var(--text-hinting); font-size:var(--text-hinting); margin-top:var(--space-sm);">Uploaded {{ coi.created_at }}</p>
+
+        <div style="margin-top:var(--space-sm); display:inline-block; padding:var(--space-xs) var(--space-sm); border-radius:var(--radius-sm); font-size:var(--text-label); background:{{ coi.status_bg }}; color:{{ coi.status_color }};">
+          {{ coi.status_label }}
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+{% else %}
+  <div class="card" style="padding:var(--space-xl); text-align:center; color:var(--text-secondary);">
+    <p style="font-size:var(--text-title); margin-bottom:var(--space-md);">No certificates yet</p>
+    <p style="margin-bottom:var(--space-lg);">Upload the first COI for this vendor.</p>
+    <a href="/vendors/{{ vendor_id }}/cois/add" class="btn primary">Upload COI</a>
+  </div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', async () => {
+  const deleteBtns = document.querySelectorAll('[data-coi-id]');
+  deleteBtns.forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const coiId = btn.getAttribute('data-coi-id');
+      if (!confirm('Delete this certificate?')) return;
+      try {
+        const resp = await fetch(`/api/cois/${coiId}`, { method: 'DELETE', credentials: 'same-origin' });
+        if (resp.ok) {
+          window.location.reload();
+        } else {
+          alert('Failed to delete certificate.');
+        }
+      } catch (err) {
+        alert('Network error.');
+      }
+    });
+  });
+});
+</script>
+{% endblock %}

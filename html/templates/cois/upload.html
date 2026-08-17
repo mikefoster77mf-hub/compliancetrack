@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+
+{% block title %}Upload COI — {{ vendor_name }} — ComplianceTrack{% endblock %}
+
+{% block content %}
+<div style="max-width:600px; margin:0 auto;">
+  <h2 style="margin-bottom:var(--space-lg);">Upload certificate of insurance</h2>
+  <p style="color:var(--text-secondary); margin-bottom:var(--space-lg);">For <strong>{{ vendor_name }}</strong></p>
+
+  <form id="coi-form" style="display:flex; flex-direction:column; gap:var(--space-md);">
+    <input type="hidden" name="vendor_id" value="{{ vendor_id }}">
+
+    <label>
+      Insurance type
+      <input type="text" name="insurance_type"
+        style="width:100%; padding:var(--space-sm) var(--space-md); border:1px solid var(--border-subtle); border-radius:var(--radius-md); background:var(--surface-elevated); color:var(--text-primary); font-size:inherit;"
+        placeholder="e.g. General Liability, Auto, Workers Comp">
+    </label>
+
+    <div style="display:flex; gap:var(--space-md);">
+      <div style="flex:1;">
+        <label>
+          Issued date
+          <input type="date" name="issued_date"
+            style="width:100%; padding:var(--space-sm) var(--space-md); border:1px solid var(--border-subtle); border-radius:var(--radius-md); background:var(--surface-elevated); color:var(--text-primary); font-size:inherit;">
+        </label>
+      </div>
+      <div style="flex:1;">
+        <label>
+          Expiration date
+          <input type="date" name="expiring_date"
+            style="width:100%; padding:var(--space-sm) var(--space-md); border:1px solid var(--border-subtle); border-radius:var(--radius-md); background:var(--surface-elevated); color:var(--text-primary); font-size:inherit;">
+        </label>
+      </div>
+    </div>
+
+    <label>
+      PDF file
+      <input type="file" name="pdf" accept=".pdf"
+        style="width:100%; padding:var(--space-sm) var(--space-md); border:1px solid var(--border-subtle); border-radius:var(--radius-md); background:var(--surface-elevated); color:var(--text-primary); font-size:inherit;">
+      <p style="color:var(--text-hinting); font-size:var(--text-hinting); margin-top:var(--space-xs);">Upload the certificate PDF. Optional but recommended.</p>
+    </label>
+
+    <label>
+      Notes
+      <textarea name="notes" rows="3"
+        style="width:100%; padding:var(--space-sm) var(--space-md); border:1px solid var(--border-subtle); border-radius:var(--radius-md); background:var(--surface-elevated); color:var(--text-primary); font-size:inherit; resize:vertical;"
+        placeholder="Any relevant notes about this certificate..."></textarea>
+    </label>
+
+    <div style="display:flex; gap:var(--space-md);">
+      <button type="submit" class="btn primary" style="flex:1; justify-content:center;">
+        Upload COI
+      </button>
+      <a href="/vendors/{{ vendor_id }}/cois" style="flex:0 0 auto; color:var(--text-secondary); text-decoration:underline;">Cancel</a>
+    </div>
+
+    <p id="coi-status" style="margin-top:var(--space-md); text-align:center; font-size:var(--text-label); min-height:1.4em;"></p>
+  </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const form = document.getElementById('coi-form');
+  const status = document.getElementById('coi-status');
+  if (!form || !status) return;
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = form.querySelector('button[type="submit"]');
+    const originalText = btn.textContent;
+
+    btn.disabled = true;
+    btn.textContent = 'Uploading…';
+    status.textContent = '';
+    status.style.color = 'var(--text-hinting)';
+
+    const formData = new FormData(form);
+    const vendorId = formData.get('vendor_id');
+    const insuranceType = formData.get('insurance_type') || '';
+    const expiringDate = formData.get('expiring_date') || '';
+    const issuedDate = formData.get('issued_date') || '';
+    const notes = formData.get('notes') || '';
+    const pdfFile = formData.get('pdf');
+
+    try {
+      const fetchOptions = {
+        method: 'POST',
+        credentials: 'same-origin',
+      };
+
+      if (pdfFile && pdfFile.size > 0) {
+        // Use FormData for file upload
+        const body = new FormData();
+        body.append('vendor_id', vendorId);
+        body.append('insurance_type', insuranceType);
+        body.append('expiring_date', expiringDate);
+        body.append('issued_date', issuedDate);
+        body.append('notes', notes);
+        body.append('pdf', pdfFile);
+
+        fetchOptions.body = body;
+        // Don't set Content-Type — browser sets it with boundary for FormData
+      } else {
+        fetchOptions.headers = { 'Content-Type': 'application/json' };
+        fetchOptions.body = JSON.stringify({
+          vendor_id: vendorId,
+          insurance_type: insuranceType,
+          expiring_date: expiringDate,
+          issued_date: issuedDate,
+          notes: notes,
+        });
+      }
+
+      const resp = await fetch('/api/cois', fetchOptions);
+      const result = await resp.json();
+
+      if (resp.ok) {
+        window.location.href = '/vendors/' + vendorId + '/cois';
+      } else {
+        btn.textContent = originalText;
+        btn.disabled = false;
+        status.textContent = result.detail || 'Failed to upload COI — please try again.';
+        status.style.color = 'var(--error)';
+      }
+    } catch (err) {
+      btn.textContent = originalText;
+      btn.disabled = false;
+      status.textContent = 'Network error — please try again.';
+      status.style.color = 'var(--error)';
+    }
+  });
+});
+</script>
+{% endblock %}

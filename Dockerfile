@@ -2,9 +2,9 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Python deps
+# Python deps (install from pyproject.toml so new deps are picked up)
 COPY backend/pyproject.toml .
-RUN pip install --no-cache-dir fastapi uvicorn[standard] psycopg2-binary
+RUN pip install --no-cache-dir bcrypt itsdangerous jinja2 python-multipart fastapi uvicorn[standard] psycopg2-binary
 
 # App code
 COPY backend/main.py .

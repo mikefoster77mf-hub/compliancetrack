@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}ComplianceTrack{% endblock %}</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 36 36' fill='none'%3E%3Cpath d='M18 3L4 9v6c0 7.5 5 12.5 14 14.5 9-2 14-7 14-14.5V9L18 3z' fill='%23a855f7' opacity='0.15'/%3E%3Cpath d='M18 3L4 9v6c0 7.5 5 12.5 14 14.5 9-2 14-7 14-14.5V9L18 3z' stroke='%23a855f7' stroke-width='2' stroke-linejoin='round'/%3E%3Cpath d='M13 18l4 4 10-10' stroke='%23a855f7' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/style.css?v=3">
+</head>
+<body>
+  <div class="wrapper">
+
+    <header class="site-header">
+      <div class="logo">
+        <svg width="36" height="36" viewBox="0 0 36 36" fill="none" aria-hidden="true">
+          <path d="M18 3L4 9v6c0 7.5 5 12.5 14 14.5 9-2 14-7 14-14.5V9L18 3z" fill="var(--accent-primary)" opacity="0.15"/>
+          <path d="M18 3L4 9v6c0 7.5 5 12.5 14 14.5 9-2 14-7 14-14.5V9L18 3z" stroke="var(--accent-primary)" stroke-width="2" stroke-linejoin="round"/>
+          <path d="M13 18l4 4 10-10" stroke="var(--accent-primary)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span class="brand">ComplianceTrack</span>
+      </div>
+      <nav class="nav" aria-label="Page navigation">
+        {% if user %}
+          <a href="/dashboard">Dashboard</a>
+          <a href="/vendors">Vendors</a>
+          <span class="user-name" style="margin-left:12px; color:var(--text-secondary);">{{ user.name or user.email }}</span>
+          <form action="/api/auth/logout" method="post" style="display:inline; margin-left:8px;">
+            <button type="submit" style="background:none; border:none; color:var(--text-secondary); cursor:pointer; font-size:inherit; text-decoration:underline;">Log out</button>
+          </form>
+        {% else %}
+          <a href="/login">Log in</a>
+          <a href="/signup" class="btn primary" style="margin-left:8px;">Sign up</a>
+        {% endif %}
+      </nav>
+    </header>
+
+    <main>
+      {% if error %}
+        <div style="background:var(--surface-error); color:var(--text-on-error); padding:var(--space-md); border-radius:var(--radius-md); margin-bottom:var(--space-lg); border:1px solid var(--border-error);">
+          {{ error }}
+        </div>
+      {% endif %}
+      {% block content %}{% endblock %}
+    </main>
+
+    <footer class="site-footer">
+      <p>ComplianceTrack — Automated vendor compliance &amp; COI tracking for General Contractors</p>
+      <p style="margin-top:var(--space-sm)">Working title — brand TBD. &copy; 2026</p>
+    </footer>
+
+  </div>
+
+  {% block scripts %}{% endblock %}
+</body>
+</html>

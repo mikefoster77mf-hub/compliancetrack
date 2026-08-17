@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+
+{% block title %}Add vendor — ComplianceTrack{% endblock %}
+
+{% block content %}
+<div style="max-width:500px; margin:0 auto;">
+  <h2 style="margin-bottom:var(--space-lg);">Add vendor</h2>
+
+  <form id="vendor-form" style="display:flex; flex-direction:column; gap:var(--space-md);">
+    <label>
+      Name <span style="color:var(--error);">*</span>
+      <input type="text" name="name" required
+        style="width:100%; padding:var(--space-sm) var(--space-md); border:1px solid var(--border-subtle); border-radius:var(--radius-md); background:var(--surface-elevated); color:var(--text-primary); font-size:inherit;"
+        placeholder="e.g. Acme Construction LLC">
+    </label>
+    <label>
+      Email
+      <input type="email" name="email"
+        style="width:100%; padding:var(--space-sm) var(--space-md); border:1px solid var(--border-subtle); border-radius:var(--radius-md); background:var(--surface-elevated); color:var(--text-primary); font-size:inherit;"
+        placeholder="vendor@example.com">
+    </label>
+    <label>
+      Phone
+      <input type="text" name="phone"
+        style="width:100%; padding:var(--space-sm) var(--space-md); border:1px solid var(--border-subtle); border-radius:var(--radius-md); background:var(--surface-elevated); color:var(--text-primary); font-size:inherit;"
+        placeholder="(555) 123-4567">
+    </label>
+    <label>
+      Address
+      <textarea name="address" rows="2"
+        style="width:100%; padding:var(--space-sm) var(--space-md); border:1px solid var(--border-subtle); border-radius:var(--radius-md); background:var(--surface-elevated); color:var(--text-primary); font-size:inherit; resize:vertical;"></textarea>
+    </label>
+    <label>
+      Notes
+      <textarea name="notes" rows="3"
+        style="width:100%; padding:var(--space-sm) var(--space-md); border:1px solid var(--border-subtle); border-radius:var(--radius-md); background:var(--surface-elevated); color:var(--text-primary); font-size:inherit; resize:vertical;"
+        placeholder="Any relevant notes about this vendor..."></textarea>
+    </label>
+
+    <div style="display:flex; gap:var(--space-md);">
+      <button type="submit" class="btn primary" style="flex:1; justify-content:center;">
+        Add vendor
+      </button>
+      <a href="/vendors" style="flex:0 0 auto; color:var(--text-secondary); text-decoration:underline;">Cancel</a>
+    </div>
+
+    <p id="vendor-status" style="margin-top:var(--space-md); text-align:center; font-size:var(--text-label); min-height:1.4em;"></p>
+  </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const form = document.getElementById('vendor-form');
+  const status = document.getElementById('vendor-status');
+  if (!form || !status) return;
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = form.querySelector('button[type="submit"]');
+    const originalText = btn.textContent;
+
+    btn.disabled = true;
+    btn.textContent = 'Adding…';
+    status.textContent = '';
+    status.style.color = 'var(--text-hinting)';
+
+    const formData = new FormData(form);
+    const data = {
+      name: formData.get('name') || '',
+      email: formData.get('email') || '',
+      phone: formData.get('phone') || '',
+      address: formData.get('address') || '',
+      notes: formData.get('notes') || '',
+    };
+
+    try {
+      const resp = await fetch('/api/vendors', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+        credentials: 'same-origin',
+      });
+
+      const result = await resp.json();
+
+      if (resp.ok) {
+        window.location.href = '/vendors/' + result.id;
+      } else {
+        btn.textContent = originalText;
+        btn.disabled = false;
+        status.textContent = result.detail || 'Failed to add vendor — please try again.';
+        status.style.color = 'var(--error)';
+      }
+    } catch (err) {
+      btn.textContent = originalText;
+      btn.disabled = false;
+      status.textContent = 'Network error — please try again.';
+      status.style.color = 'var(--error)';
+    }
+  });
+});
+</script>
+{% endblock %}

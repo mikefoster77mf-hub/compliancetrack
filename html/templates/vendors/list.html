@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block title %}Vendors — ComplianceTrack{% endblock %}
+
+{% block content %}
+<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:var(--space-lg);">
+  <h2 style="margin:0;">Vendors</h2>
+  <a href="/vendors/add" class="btn primary">Add vendor</a>
+</div>
+
+{% if vendors.vendors %}
+  <div style="display:grid; gap:var(--space-md); grid-template-columns:repeat(auto-fit, minmax(300px,1fr));">
+    {% for v in vendors.vendors %}
+      <div class="card" style="padding:var(--space-lg); border-left:4px solid var(--accent-primary);">
+        <div style="display:flex; justify-content:space-between; align-items:start;">
+          <div>
+            <h3 style="margin:0 0 var(--space-sm) 0; font-size:var(--text-title);">{{ v.name }}</h3>
+            {% if v.email %}<p style="color:var(--text-secondary); font-size:var(--text-label); margin-bottom:var(--space-xs);">{{ v.email }}</p>{% endif %}
+            {% if v.phone %}<p style="color:var(--text-hinting); font-size:var(--text-label); margin-bottom:var(--space-xs);">{{ v.phone }}</p>{% endif %}
+          </div>
+          <a href="/vendors/{{ v.id }}" style="background:none; border:none; color:var(--accent-primary); cursor:pointer; font-size:var(--text-label); text-decoration:underline;">View</a>
+        </div>
+        <p style="font-size:var(--text-hinting); margin-top:var(--space-sm);">Created {{ v.created_at.strftime('%Y-%m-%d') if v.created_at else '—' }}</p>
+      </div>
+    {% endfor %}
+  </div>
+{% else %}
+  <div class="card" style="padding:var(--space-xl); text-align:center; color:var(--text-secondary);">
+    <p style="font-size:var(--text-title); margin-bottom:var(--space-md);">No vendors yet</p>
+    <p style="margin-bottom:var(--space-lg);">Add your first vendor to start tracking their certificates of insurance.</p>
+    <a href="/vendors/add" class="btn primary">Add your first vendor</a>
+  </div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', async () => {
+  try {
+    const resp = await fetch('/api/vendors', { credentials: 'same-origin' });
+    if (resp.ok) {
+      const data = await resp.json();
+      const list = document.querySelector('#vendors-list') || document.querySelector('main');
+      // Re-render if needed (server already rendered, this is just for dynamic refresh)
+    }
+  } catch (err) {
+    console.error('Failed to load vendors:', err);
+  }
+});
+</script>
+{% endblock %}
