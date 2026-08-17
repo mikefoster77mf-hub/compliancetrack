@@ -4,7 +4,7 @@ WORKDIR /app
 
 # Python deps (install from pyproject.toml so new deps are picked up)
 COPY backend/pyproject.toml .
-RUN pip install --no-cache-dir bcrypt itsdangerous jinja2 python-multipart fastapi uvicorn[standard] psycopg2-binary
+RUN pip install --no-cache-dir bcrypt itsdangerous jinja2 python-multipart fastapi uvicorn[standard] psycopg2-binary aiofiles
 
 # App code
 COPY backend/main.py .

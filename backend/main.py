@@ -8,6 +8,8 @@ from datetime import date, datetime, timedelta
 
 from scheduler import start_scheduler
 
+from uploads import router as uploads_router
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -17,6 +19,9 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+
+# Mount upload router (async endpoints)
+app.include_router(uploads_router)
 
 DB_HOST = os.getenv("DB_HOST", "db")
 DB_USER = os.getenv("POSTGRES_USER", "myuser")
