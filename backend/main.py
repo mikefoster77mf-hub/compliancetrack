@@ -502,7 +502,8 @@ async def api_vendors(request: Request):
                 address TEXT DEFAULT '',
                 notes TEXT DEFAULT '',
                 created_at TIMESTAMPTZ DEFAULT NOW(),
-                updated_at TIMESTAMPTZ DEFAULT NOW()
+                updated_at TIMESTAMPTZ DEFAULT NOW(),
+                magic_token TEXT DEFAULT NULL
             );
             """
         )
@@ -547,7 +548,8 @@ async def api_vendors_create(data: dict, request: Request):
                 address TEXT DEFAULT '',
                 notes TEXT DEFAULT '',
                 created_at TIMESTAMPTZ DEFAULT NOW(),
-                updated_at TIMESTAMPTZ DEFAULT NOW()
+                updated_at TIMESTAMPTZ DEFAULT NOW(),
+                magic_token TEXT DEFAULT NULL
             );
             """
         )
@@ -675,7 +677,10 @@ async def api_cois(request: Request, vendor_id: int | None = None):
                 issued_date DATE DEFAULT NULL,
                 notes TEXT DEFAULT '',
                 created_at TIMESTAMPTZ DEFAULT NOW(),
-                updated_at TIMESTAMPTZ DEFAULT NOW()
+                updated_at TIMESTAMPTZ DEFAULT NOW(),
+                pdf_path TEXT DEFAULT NULL,
+                status TEXT DEFAULT NULL,
+                notified_email TEXT DEFAULT NULL
             );
             """
         )
@@ -775,7 +780,10 @@ async def api_cois_create(
                 issued_date DATE DEFAULT NULL,
                 notes TEXT DEFAULT '',
                 created_at TIMESTAMPTZ DEFAULT NOW(),
-                updated_at TIMESTAMPTZ DEFAULT NOW()
+                updated_at TIMESTAMPTZ DEFAULT NOW(),
+                pdf_path TEXT DEFAULT NULL,
+                status TEXT DEFAULT NULL,
+                notified_email TEXT DEFAULT NULL
             );
             """
         )
@@ -932,7 +940,10 @@ async def api_dashboard(request: Request):
                 issued_date DATE DEFAULT NULL,
                 notes TEXT DEFAULT '',
                 created_at TIMESTAMPTZ DEFAULT NOW(),
-                updated_at TIMESTAMPTZ DEFAULT NOW()
+                updated_at TIMESTAMPTZ DEFAULT NOW(),
+                pdf_path TEXT DEFAULT NULL,
+                status TEXT DEFAULT NULL,
+                notified_email TEXT DEFAULT NULL
             );
             """
         )
@@ -947,7 +958,8 @@ async def api_dashboard(request: Request):
                 address TEXT DEFAULT '',
                 notes TEXT DEFAULT '',
                 created_at TIMESTAMPTZ DEFAULT NOW(),
-                updated_at TIMESTAMPTZ DEFAULT NOW()
+                updated_at TIMESTAMPTZ DEFAULT NOW(),
+                magic_token TEXT DEFAULT NULL
             );
             """
         )
