@@ -1,14 +1,3 @@
-# Local development secrets
+backend/__pycache__
+fetch_gitlab_users.py
 .env
-*.env.local
-# Certificate private keys and public certs (not needed on live host;
-# Render/other hosts provision their own via Let's Encrypt)
-certs/
-# Not app files — dev/verification artifacts
-verify-output.json
-verify.sh
-.sysctl-staging.conf
-.hermes/
-# IDE
-.vscode/
-.idea/
