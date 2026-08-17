@@ -1,6 +1,7 @@
 import os
 import uuid
 import asyncio
+import psycopg2
 from fastapi import APIRouter, UploadFile, File, HTTPException, BackgroundTasks
 
 router = APIRouter(prefix="/api/v1", tags=["uploads"])
@@ -8,8 +9,8 @@ router = APIRouter(prefix="/api/v1", tags=["uploads"])
 UPLOAD_DIR = "uploaded_cois"
 MAX_FILE_SIZE = 25 * 1024 * 1024  # 25MB cap for COI PDFs
 
+
 # ── DB helper (self-contained, no circular import with main.py) ────────────
-import psycopg2, os
 
 def get_db():
     return psycopg2.connect(
@@ -21,6 +22,7 @@ def get_db():
 
 
 # ── Async email dispatch (runs in background AFTER response) ──────────────
+
 async def send_async_email_notification(vendor_email: str, doc_name: str):
     """Fire-and-forget email. Runs in background task — never blocks the request.
 
@@ -32,6 +34,7 @@ async def send_async_email_notification(vendor_email: str, doc_name: str):
 
 
 # ── Upload endpoint ────────────────────────────────────────────────────────
+
 @router.post("/upload/{token}")
 async def upload_coi_document(
     token: str,
@@ -63,7 +66,6 @@ async def upload_coi_document(
             while chunk := await file.read(1024 * 1024):  # 1MB chunks
                 bytes_written += len(chunk)
                 if bytes_written > MAX_FILE_SIZE:
-                    # Abort mid-stream — leave tmp for cleanup
                     raise HTTPException(
                         status_code=413,
                         detail=f"File exceeds {MAX_FILE_SIZE // (1024*1024)}MB limit",
