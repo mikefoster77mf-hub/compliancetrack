@@ -15,4 +15,5 @@ COPY html/ /app/html/
 EXPOSE 8000
 
 # Run uvicorn only — Render terminates TLS at the edge
+# (rebuild trigger: force cache invalidation after HTML fixes)
 CMD uvicorn main:app --host 0.0.0.0 --port 8000
