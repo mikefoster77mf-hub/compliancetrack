@@ -54,6 +54,8 @@ class CoiModel(Base):
     status: Mapped[str | None] = mapped_column(String, nullable=True)
     notified_email: Mapped[str | None] = mapped_column(String, nullable=True)
     archived: Mapped[bool] = mapped_column(default=False)  # True = superseded by newer version
+    last_reminder_days_out: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    alert_sent_at: Mapped[DateTime | None] = mapped_column(DateTime, nullable=True)
 
 
 # ── Async email dispatch (runs in background AFTER response) ──────────────

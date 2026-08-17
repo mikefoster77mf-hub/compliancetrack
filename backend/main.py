@@ -682,7 +682,9 @@ async def api_cois(request: Request, vendor_id: int | None = None):
                 pdf_path TEXT DEFAULT NULL,
                 status TEXT DEFAULT NULL,
                 notified_email TEXT DEFAULT NULL,
-                archived BOOLEAN DEFAULT FALSE
+                archived BOOLEAN DEFAULT FALSE,
+                last_reminder_days_out INTEGER DEFAULT NULL,
+                alert_sent_at TIMESTAMPTZ DEFAULT NULL
             );
             """
         )
@@ -786,7 +788,9 @@ async def api_cois_create(
                 pdf_path TEXT DEFAULT NULL,
                 status TEXT DEFAULT NULL,
                 notified_email TEXT DEFAULT NULL,
-                archived BOOLEAN DEFAULT FALSE
+                archived BOOLEAN DEFAULT FALSE,
+                last_reminder_days_out INTEGER DEFAULT NULL,
+                alert_sent_at TIMESTAMPTZ DEFAULT NULL
             );
             """
         )
@@ -947,7 +951,9 @@ async def api_dashboard(request: Request):
                 pdf_path TEXT DEFAULT NULL,
                 status TEXT DEFAULT NULL,
                 notified_email TEXT DEFAULT NULL,
-                archived BOOLEAN DEFAULT FALSE
+                archived BOOLEAN DEFAULT FALSE,
+                last_reminder_days_out INTEGER DEFAULT NULL,
+                alert_sent_at TIMESTAMPTZ DEFAULT NULL
             );
             """
         )
