@@ -1,8 +1,9 @@
 import os
 import uuid
-import asyncio
-import psycopg2
-from fastapi import APIRouter, UploadFile, File, HTTPException, BackgroundTasks
+from fastapi import APIRouter, UploadFile, File, HTTPException, BackgroundTasks, Depends
+from sqlalchemy import select, insert, update, text, func
+from sqlalchemy.ext.asyncio import AsyncSession
+from async_db import get_async_db, Base
 
 router = APIRouter(prefix="/api/v1", tags=["uploads"])
 
@@ -10,15 +11,48 @@ UPLOAD_DIR = "uploaded_cois"
 MAX_FILE_SIZE = 25 * 1024 * 1024  # 25MB cap for COI PDFs
 
 
-# ── DB helper (self-contained, no circular import with main.py) ────────────
+# ── ORM models (match existing psycopg2 schema + columns needed by upload) ─
 
-def get_db():
-    return psycopg2.connect(
-        host=os.getenv("DB_HOST", "db"),
-        user=os.getenv("POSTGRES_USER", "myuser"),
-        password=os.getenv("POSTGRES_PASSWORD", "mypassword"),
-        dbname=os.getenv("POSTGRES_DB", "myapp"),
-    )
+from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import String, Integer, Date, DateTime, Text
+
+
+class VendorModel(Base):
+    __tablename__ = "vendors"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    email: Mapped[str] = mapped_column(String, default="")
+    phone: Mapped[str] = mapped_column(String, default="")
+    address: Mapped[str] = mapped_column(String, default="")
+    notes: Mapped[str] = mapped_column(String, default="")
+    created_at: Mapped[DateTime] = mapped_column(DateTime, nullable=True)
+    updated_at: Mapped[DateTime] = mapped_column(DateTime, nullable=True)
+    # ── Columns needed by the upload endpoint (add to DB if not present) ──
+    magic_token: Mapped[str | None] = mapped_column(String, unique=True, nullable=True)
+
+
+class CoiModel(Base):
+    __tablename__ = "cois"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    vendor_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    user_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    # ── Existing column uses BYTEA for the PDF binary; upload endpoint also ─
+    # ── writes to disk, so we track the file path separately.                ─
+    pdf_data: Mapped[bytes | None] = mapped_column(Text, nullable=True)  # BYTEA→Text placeholder
+    pdf_filename: Mapped[str] = mapped_column(String, default="")
+    insurance_type: Mapped[str] = mapped_column(String, default="")
+    expiring_date: Mapped[Date | None] = mapped_column(Date, nullable=True)
+    issued_date: Mapped[Date | None] = mapped_column(Date, nullable=True)
+    notes: Mapped[str] = mapped_column(String, default="")
+    created_at: Mapped[DateTime] = mapped_column(DateTime, nullable=True)
+    updated_at: Mapped[DateTime] = mapped_column(DateTime, nullable=True)
+    # ── Columns needed by the upload endpoint (add to DB if not present) ──
+    pdf_path: Mapped[str | None] = mapped_column(String, nullable=True)
+    status: Mapped[str | None] = mapped_column(String, nullable=True)
+    notified_email: Mapped[str | None] = mapped_column(String, nullable=True)
 
 
 # ── Async email dispatch (runs in background AFTER response) ──────────────
@@ -27,7 +61,6 @@ async def send_async_email_notification(vendor_email: str, doc_name: str):
     """Fire-and-forget email. Runs in background task — never blocks the request.
 
     Replace the print with real aiosmtplib / Resend / SendGrid call when ready.
-    This function is already async — just await your email client inside.
     """
     print(f"[background] Sending compliance notification email to {vendor_email} "
           f"for {doc_name}")
@@ -40,16 +73,22 @@ async def upload_coi_document(
     token: str,
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_async_db),
 ):
     # 1. Quick extension check — in-memory, non-blocking
     if not file.filename or not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Only PDF certificates are accepted.")
 
-    # 2. Token → vendor lookup — DB call in a thread, never blocks the event loop
-    vendor = await asyncio.to_thread(_lookup_vendor_by_token, token)
+    # 2. Token → vendor lookup — native async SQLAlchemy, no thread needed
+    result = await db.execute(
+        select(VendorModel.id, VendorModel.user_id, VendorModel.email, VendorModel.name).where(
+            VendorModel.magic_token == token
+        )
+    )
+    vendor = result.fetchone()
     if not vendor:
         raise HTTPException(status_code=404, detail="Invalid magic link.")
-    vendor_email = vendor["email"]
+    vendor_id, vendor_user_id, vendor_email, vendor_name = vendor
 
     # 3. Secure async file write — atomic tmp + rename, 1MB chunks
     file_ext = os.path.splitext(file.filename)[1]  # always .pdf here
@@ -86,10 +125,19 @@ async def upload_coi_document(
             os.remove(final_path)
         raise HTTPException(status_code=500, detail=f"File storage failed: {e}")
 
-    # 4. DB status update — also off the event loop (sync psycopg2 in a thread)
-    await asyncio.to_thread(
-        _update_coi_status, vendor["id"], final_path, vendor_email
+    # 4. DB status update — native async SQLAlchemy insert
+    await db.execute(
+        insert(CoiModel).values(
+            vendor_id=vendor_id,
+            user_id=vendor_user_id,  # owner of the vendor (from token lookup)
+            pdf_path=final_path,
+            pdf_filename=file.filename,
+            status="GREEN",
+            notified_email=vendor_email,
+            created_at=func.now(),
+        )
     )
+    await db.commit()  # explicit commit — get_async_db also commits on yield, but we need it now
 
     # 5. Background email — fires AFTER the HTTP response is sent back to user
     background_tasks.add_task(
@@ -104,50 +152,3 @@ async def upload_coi_document(
         "message": "Certificate uploaded successfully. Processing in background.",
         "filename": unique_name,
     }
-
-
-# ── Sync DB helpers (run in threads, never on the event loop) ─────────────
-
-def _lookup_vendor_by_token(token: str) -> dict | None:
-    """Sync psycopg2 lookup — called via asyncio.to_thread in the endpoint.
-
-    Replace the query with your actual token→vendor mapping.
-    Expected columns: vendors.magic_token TEXT, vendors.email TEXT, vendors.id SERIAL.
-    """
-    conn = get_db()
-    try:
-        cur = conn.cursor()
-        cur.execute(
-            "SELECT id, email, name FROM vendors WHERE magic_token = %s;",
-            (token,),
-        )
-        row = cur.fetchone()
-        cur.close()
-        if row:
-            return {"id": row[0], "email": row[1], "name": row[2]}
-    finally:
-        conn.close()
-    return None
-
-
-def _update_coi_status(vendor_id: int, file_path: str, vendor_email: str):
-    """Sync psycopg2 update — called via asyncio.to_thread in the endpoint.
-
-    Inserts a record into the cois table tracking the uploaded file.
-    Adjust the table/column names to match your schema.
-    """
-    conn = get_db()
-    try:
-        cur = conn.cursor()
-        cur.execute(
-            """
-            INSERT INTO cois (vendor_id, pdf_path, status, notified_email, created_at)
-            VALUES (%s, %s, 'GREEN', %s, NOW())
-            ON CONFLICT (vendor_id, pdf_path) DO UPDATE SET status = 'GREEN';
-            """,
-            (vendor_id, file_path, vendor_email),
-        )
-        conn.commit()
-        cur.close()
-    finally:
-        conn.close()
