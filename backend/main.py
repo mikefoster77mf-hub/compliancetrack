@@ -1088,6 +1088,16 @@ async def api_settings_update(request: Request, data: dict):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/api/debug-templates")
+async def debug_templates():
+    """Diagnostic: list template directory contents."""
+    import os
+    tdir = "/app/html/templates"
+    if not os.path.isdir(tdir):
+        return {"error": "templates dir not found", "path": tdir}
+    return {"exists": True, "path": tdir, "contents": sorted(os.listdir(tdir))}
+
+
 # ── Static files ────────────────────────────────────────────────────────────
 # Mounted AFTER API routes so API paths take priority.
 app.mount("/", StaticFiles(directory="/app/html", html=True), name="static")
