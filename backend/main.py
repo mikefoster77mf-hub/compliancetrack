@@ -2,14 +2,14 @@ from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.responses import JSONResponse, FileResponse, HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from contextlib import asynccontextflow
+from contextlib import asynccontextmanager
 import os, socket, psycopg2, psycopg2.extras, time, bcrypt, itsdangerous, base64
 from datetime import date, datetime, timedelta
 
 from scheduler import start_scheduler
 
 
-@asynccontextflow
+@asynccontextmanager
 async def lifespan(app: FastAPI):
     """Start background scheduler on app startup."""
     start_scheduler()
