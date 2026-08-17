@@ -8,6 +8,8 @@ RUN pip install --no-cache-dir bcrypt itsdangerous jinja2 python-multipart fasta
 
 # App code
 COPY backend/main.py .
+COPY backend/scheduler.py .
+COPY backend/reminders.py .
 COPY html/ /app/html/
 
 EXPOSE 8000
