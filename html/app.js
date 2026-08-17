@@ -1,19 +1,12 @@
 document.addEventListener('DOMContentLoaded', () => {
-  // Emoji favicon + visible emoji element
-  const emojiFavicon = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"%3E%3Ctext x="50" y="70" font-size="70' +
-    '" text-anchor="middle" font-family="Apple Color Emoji, Segoe UI Emoji, Noto Color Emoji, EmojiOne Color, sans-serif"%' +
-    '3E🎌%3C/text%3E%3C/svg%3E';
+  // Favicon — shield SVG (matches landing page)
+  const shieldFavicon = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36" fill="none"%3E%3Cpath d="M18 3L4 9v6c0 7.5 5 12.5 14 14.5 9-2 14-7 14-14.5V9L18 3z" fill="%23a855f7" opacity="0.15"/%3E%3Cpath d="M18 3L4 9v6c0 7.5 5 12.5 14 14.5 9-2 14-7 14-14.5V9L18 3z" stroke="%23a855f7" stroke-width="2" stroke-linejoin="round"/%3E%3Cpath d="M13 18l4 4 10-10" stroke="%23a855f7" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/%3E%3C/svg%3E';
 
   const link = document.createElement('link');
   link.rel = 'icon';
   link.type = 'image/svg+xml';
-  link.href = emojiFavicon;
+  link.href = shieldFavicon;
   document.head.appendChild(link);
-
-  const emojiEl = document.createElement('span');
-  emojiEl.textContent = '🎌';
-  emojiEl.style.cssText = 'font-size: 28px; margin-right: 8px; display: inline-block; vertical-align: middle;';
-  document.querySelector('.logo')?.prepend(emojiEl);
 
   // ── API test buttons ──────────────────────────────────────────
   const apiUrls = {

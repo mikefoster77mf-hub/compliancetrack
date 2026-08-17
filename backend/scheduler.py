@@ -4,13 +4,13 @@ Runs check_and_send() once per day. Starts when the FastAPI app starts
 via a lifespan event. Uses a simple threading.Timer loop for MVP.
 """
 
+import logging
 import threading
 import time
-import logging
-from datetime import datetime
 
 from reminders import check_and_send
 
+logging.basicConfig(level=logging.INFO, format="%(asctime)s scheduler %(levelname)s: %(message)s")
 logger = logging.getLogger("scheduler")
 
 
