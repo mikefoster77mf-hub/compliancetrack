@@ -11,6 +11,8 @@ RUN pip install --no-cache-dir bcrypt itsdangerous jinja2 python-multipart \
 COPY backend/main.py .
 COPY backend/scheduler.py .
 COPY backend/reminders.py .
+COPY backend/uploads.py .
+COPY backend/async_db.py .
 # HTML (served by FastAPI StaticFiles) — bust Docker layer cache on every build
 COPY html/ /app/html/
 
