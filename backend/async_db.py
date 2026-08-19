@@ -1,5 +1,6 @@
 import os
 from typing import AsyncGenerator
+from urllib.parse import quote_plus
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.orm import DeclarativeBase
 
@@ -10,7 +11,7 @@ DB_HOST = os.getenv("DB_HOST", "db")
 DB_USER = os.getenv("POSTGRES_USER", "myuser")
 DB_PASS = os.getenv("POSTGRES_PASSWORD", "mypassword")
 DB_NAME = os.getenv("POSTGRES_DB", "myapp")
-DATABASE_URL = f"postgresql+asyncpg://{DB_USER}:{DB_PASS}@{DB_HOST}/{DB_NAME}"
+DATABASE_URL = f"postgresql+asyncpg://{DB_USER}:{quote_plus(DB_PASS)}@{DB_HOST}/{DB_NAME}"
 
 # ── Async engine ───────────────────────────────────────────────────────────
 engine = create_async_engine(

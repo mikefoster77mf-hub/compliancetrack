@@ -1,5 +1,6 @@
 import os
 import uuid
+import aiofiles
 from fastapi import APIRouter, UploadFile, File, HTTPException, BackgroundTasks, Depends
 from sqlalchemy import select, insert, update, text, func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -7,7 +8,7 @@ from async_db import get_async_db, Base
 
 router = APIRouter(prefix="/api/v1", tags=["uploads"])
 
-UPLOAD_DIR = "uploaded_cois"
+UPLOAD_DIR = "/app/uploaded_cois"
 MAX_FILE_SIZE = 25 * 1024 * 1024  # 25MB cap for COI PDFs
 
 
@@ -104,7 +105,6 @@ async def upload_coi_document(
 
     bytes_written = 0
     try:
-        import aiofiles
         async with aiofiles.open(new_tmp_path, "wb") as buf:
             while chunk := await file.read(1024 * 1024):  # 1MB chunks
                 bytes_written += len(chunk)

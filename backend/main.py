@@ -4,7 +4,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from contextlib import asynccontextmanager
 import os, socket, psycopg2, psycopg2.extras, time, bcrypt, itsdangerous, base64
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 from scheduler import start_scheduler
 
@@ -23,13 +23,21 @@ app = FastAPI(lifespan=lifespan)
 # Mount upload router (async endpoints)
 app.include_router(uploads_router)
 
-DB_HOST = os.getenv("DB_HOST", "db")
-DB_USER = os.getenv("POSTGRES_USER", "myuser")
-DB_PASS = os.getenv("POSTGRES_PASSWORD", "mypassword")
-DB_NAME = os.getenv("POSTGRES_DB", "myapp")
+DB_HOST = os.getenv("DB_HOST")
+DB_USER = os.getenv("POSTGRES_USER")
+DB_PASS = os.getenv("POSTGRES_PASSWORD")
+DB_NAME = os.getenv("POSTGRES_DB")
+
+if not all([DB_HOST, DB_USER, DB_PASS, DB_NAME]):
+    raise RuntimeError(
+        "Missing required database environment variables. "
+        "Set DB_HOST, POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB."
+    )
 
 # ── Auth ─────────────────────────────────────────────────────────────────────
-SECRET_KEY = os.getenv("SECRET_KEY", "change-me-in-production")
+SECRET_KEY = os.getenv("SECRET_KEY")
+if not SECRET_KEY:
+    raise RuntimeError("Missing required environment variable: SECRET_KEY")
 _sig = itsdangerous.Signer(SECRET_KEY)
 
 templates = Jinja2Templates(directory="/app/html/templates")
@@ -78,6 +86,28 @@ def get_db():
 
 
 # ── API routes (registered first so they take priority over static mount) ──
+
+@app.get("/api/")
+async def api_root():
+    return {
+        "name": "ComplianceTrack API",
+        "version": "1.0",
+        "endpoints": [
+            "/api/health",
+            "/api/db-check",
+            "/api/db-items",
+            "/api/db-seed",
+            "/api/waitlist",
+            "/api/auth/signup",
+            "/api/auth/login",
+            "/api/auth/logout",
+            "/api/auth/me",
+            "/api/vendors",
+            "/api/cois",
+            "/api/dashboard",
+            "/api/settings",
+        ],
+    }
 
 @app.get("/api/health")
 async def api_health():
@@ -717,13 +747,14 @@ async def api_cois(request: Request, vendor_id: int | None = None):
             status_color = "var(--text-hinting)"
             status_bg = "var(--surface-elevated)"
             status_label = "No date"
+            utc_today = datetime.now(timezone.utc).date()
             if d.get("expiring_date"):
                 exp = date.fromisoformat(d["expiring_date"])
-                if exp < date.today():
+                if exp < utc_today:
                     status_color = "var(--error)"
                     status_bg = "var(--surface-error)"
                     status_label = "Expired"
-                elif exp <= date.today() + timedelta(days=30):
+                elif exp <= utc_today + timedelta(days=30):
                     status_color = "var(--warning)"
                     status_bg = "var(--surface-warning)"
                     status_label = "Expiring soon"
@@ -748,7 +779,6 @@ async def api_cois_create(
     expiring_date: str = "",
     issued_date: str = "",
     notes: str = "",
-    pdf: bytes | None = None,
 ):
     user = await get_current_user(request)
     if not user:
@@ -763,12 +793,6 @@ async def api_cois_create(
         cur.close()
         conn.close()
         raise HTTPException(status_code=404, detail="Vendor not found.")
-
-    pdf_data = None
-    pdf_filename = ""
-    if pdf:
-        pdf_data = base64.b64encode(pdf).decode()
-        pdf_filename = getattr(pdf, "filename", "certificate.pdf") or "certificate.pdf"
 
     try:
         cur.execute(
@@ -810,8 +834,8 @@ async def api_cois_create(
                 pass
 
         cur.execute(
-            "INSERT INTO cois (vendor_id, user_id, pdf_data, pdf_filename, insurance_type, expiring_date, issued_date, notes) VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING id, vendor_id, insurance_type, expiring_date, issued_date, notes, created_at, updated_at;",
-            (vendor_id, user["id"], pdf_data, pdf_filename, insurance_type, expiring, issued, notes),
+            "INSERT INTO cois (vendor_id, user_id, insurance_type, expiring_date, issued_date, notes) VALUES (%s, %s, %s, %s, %s, %s) RETURNING id, vendor_id, insurance_type, expiring_date, issued_date, notes, created_at, updated_at;",
+            (vendor_id, user["id"], insurance_type, expiring, issued, notes),
         )
         row = cur.fetchone()
         cur.close()
@@ -974,8 +998,8 @@ async def api_dashboard(request: Request):
             """
         )
 
-        today = date.today()
-        thirty_days = today + timedelta(days=30)
+        utc_today = datetime.now(timezone.utc).date()
+        thirty_days = utc_today + timedelta(days=30)
 
         # Counts
         cur.execute("SELECT COUNT(*) AS cnt FROM vendors WHERE user_id = %s;", (user["id"],))
@@ -987,7 +1011,7 @@ async def api_dashboard(request: Request):
         cur.execute("SELECT COUNT(*) AS cnt FROM cois WHERE user_id = %s AND expiring_date IS NOT NULL AND expiring_date <= %s;", (user["id"], thirty_days))
         expiring_soon_or_expired = cur.fetchone()["cnt"]
 
-        cur.execute("SELECT COUNT(*) AS cnt FROM cois WHERE user_id = %s AND expiring_date IS NOT NULL AND expiring_date < %s;", (user["id"], today))
+        cur.execute("SELECT COUNT(*) AS cnt FROM cois WHERE user_id = %s AND expiring_date IS NOT NULL AND expiring_date < %s;", (user["id"], utc_today))
         expired = cur.fetchone()["cnt"]
 
         valid = coi_count - expiring_soon_or_expired
@@ -1001,7 +1025,7 @@ async def api_dashboard(request: Request):
             ORDER BY c.expiring_date
             LIMIT 10;
             """,
-            (user["id"], today, thirty_days),
+            (user["id"], utc_today, thirty_days),
         )
         expiring_soon_list = [dict(r) for r in cur.fetchall()]
         for item in expiring_soon_list:

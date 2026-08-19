@@ -13,7 +13,6 @@ COPY backend/scheduler.py .
 COPY backend/reminders.py .
 # HTML (served by FastAPI StaticFiles) — bust Docker layer cache on every build
 COPY html/ /app/html/
-COPY Dockerfile /app/Dockerfile
 
 EXPOSE 8000
 
