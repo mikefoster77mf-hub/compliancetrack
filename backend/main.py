@@ -3,7 +3,7 @@ from fastapi.responses import JSONResponse, FileResponse, HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from contextlib import asynccontextmanager
-import os, socket, psycopg2, psycopg2.extras, time, bcrypt, itsdangerous, base64
+import os, socket, psycopg2, psycopg2.extras, psycopg2.pool, time, bcrypt, itsdangerous, base64
 from datetime import date, datetime, timedelta, timezone
 
 from scheduler import start_scheduler
@@ -11,17 +11,7 @@ from scheduler import start_scheduler
 from uploads import router as uploads_router
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    """Start background scheduler on app startup."""
-    start_scheduler()
-    yield
-
-
-app = FastAPI(lifespan=lifespan)
-
-# Mount upload router (async endpoints)
-app.include_router(uploads_router)
+# ── Database env vars (all required, no defaults) ─────────────────────────────
 
 DB_HOST = os.getenv("DB_HOST")
 DB_USER = os.getenv("POSTGRES_USER")
@@ -34,28 +24,77 @@ if not all([DB_HOST, DB_USER, DB_PASS, DB_NAME]):
         "Set DB_HOST, POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB."
     )
 
+# ── Connection pool (replaces per-request open/close) ─────────────────────────
+
+_db_pool = psycopg2.pool.ThreadedConnectionPool(
+    minconn=2,
+    maxconn=10,
+    host=DB_HOST,
+    user=DB_USER,
+    password=DB_PASS,
+    dbname=DB_NAME,
+)
+
+
+def get_db():
+    """Get a connection from the pool. Caller must call release_db()."""
+    conn = _db_pool.getconn()
+    conn.autocommit = False
+    return conn
+
+
+def release_db(conn):
+    """Return a connection to the pool."""
+    _db_pool.putconn(conn)
+
+
+# ── App lifespan ───────────────────────────────────────────────────────────────
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Init DB schema, then start background scheduler."""
+    init_db()
+    start_scheduler()
+    yield
+    _db_pool.closeall()
+
+
+app = FastAPI(lifespan=lifespan)
+
+# Mount upload router (async endpoints)
+app.include_router(uploads_router)
+
 # ── Auth ─────────────────────────────────────────────────────────────────────
 SECRET_KEY = os.getenv("SECRET_KEY")
 if not SECRET_KEY:
     raise RuntimeError("Missing required environment variable: SECRET_KEY")
 _sig = itsdangerous.Signer(SECRET_KEY)
 
+# ── Cookie config ─────────────────────────────────────────────────────────────
+# Set COOKIE_SECURE=false in dev for plain HTTP. Defaults to true (production).
+COOKIE_SECURE = os.getenv("COOKIE_SECURE", "true").lower() in ("1", "true", "yes")
+
 templates = Jinja2Templates(directory="/app/html/templates")
+
 
 def hash_password(plain: str) -> str:
     return bcrypt.hashpw(plain.encode(), bcrypt.gensalt()).decode()
 
+
 def check_password(plain: str, hashed: str) -> bool:
     return bcrypt.checkpw(plain.encode(), hashed.encode())
 
+
 def sign_user_id(user_id: int) -> str:
     return _sig.sign(str(user_id)).decode()
+
 
 def unsign_user_id(token: str) -> int | None:
     try:
         return int(_sig.unsign(token.encode()).decode())
     except Exception:
         return None
+
 
 async def get_current_user(request: Request) -> dict | None:
     """Read session cookie, look up user. Returns user dict or None."""
@@ -71,7 +110,7 @@ async def get_current_user(request: Request) -> dict | None:
         cur.execute("SELECT id, email, name, created_at FROM users WHERE id = %s;", (user_id,))
         row = cur.fetchone()
         cur.close()
-        conn.close()
+        release_db(conn)
         if row:
             return dict(row)
     except Exception:
@@ -79,10 +118,102 @@ async def get_current_user(request: Request) -> dict | None:
     return None
 
 
-def get_db():
-    return psycopg2.connect(
-        host=DB_HOST, user=DB_USER, password=DB_PASS, dbname=DB_NAME
+# ── Schema init (runs once at startup) ────────────────────────────────────────
+
+def init_db():
+    """Create all tables if they don't exist.
+
+    Single source of truth for the schema. No endpoint ever needs to repeat
+    CREATE TABLE IF NOT EXISTS — they just assume the tables exist.
+    """
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS items (
+            id SERIAL PRIMARY KEY,
+            name TEXT NOT NULL,
+            created_at TIMESTAMPTZ DEFAULT NOW()
+        );
+        """
     )
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS waitlist (
+            id SERIAL PRIMARY KEY,
+            name TEXT,
+            email TEXT NOT NULL UNIQUE,
+            company TEXT,
+            projects TEXT,
+            signed_up_at TIMESTAMPTZ DEFAULT NOW()
+        );
+        """
+    )
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS users (
+            id SERIAL PRIMARY KEY,
+            email TEXT NOT NULL UNIQUE,
+            password_hash TEXT NOT NULL,
+            name TEXT NOT NULL DEFAULT '',
+            timezone TEXT DEFAULT 'UTC',
+            created_at TIMESTAMPTZ DEFAULT NOW()
+        );
+        """
+    )
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS vendors (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            name TEXT NOT NULL,
+            email TEXT DEFAULT '',
+            phone TEXT DEFAULT '',
+            address TEXT DEFAULT '',
+            notes TEXT DEFAULT '',
+            created_at TIMESTAMPTZ DEFAULT NOW(),
+            updated_at TIMESTAMPTZ DEFAULT NOW(),
+            magic_token TEXT DEFAULT NULL
+        );
+        """
+    )
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS cois (
+            id SERIAL PRIMARY KEY,
+            vendor_id INTEGER NOT NULL REFERENCES vendors(id) ON DELETE CASCADE,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            pdf_data BYTEA DEFAULT NULL,
+            pdf_filename TEXT DEFAULT '',
+            insurance_type TEXT DEFAULT '',
+            expiring_date DATE DEFAULT NULL,
+            issued_date DATE DEFAULT NULL,
+            notes TEXT DEFAULT '',
+            created_at TIMESTAMPTZ DEFAULT NOW(),
+            updated_at TIMESTAMPTZ DEFAULT NOW(),
+            pdf_path TEXT DEFAULT NULL,
+            status TEXT DEFAULT NULL,
+            notified_email TEXT DEFAULT NULL,
+            archived BOOLEAN DEFAULT FALSE,
+            last_reminder_days_out INTEGER DEFAULT NULL,
+            alert_sent_at TIMESTAMPTZ DEFAULT NULL
+        );
+        """
+    )
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS reminder_settings (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+            days_before_expiry INTEGER NOT NULL DEFAULT 30,
+            email_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+            updated_at TIMESTAMPTZ DEFAULT NOW()
+        );
+        """
+    )
+    conn.commit()
+    cur.close()
+    release_db(conn)
 
 
 # ── API routes (registered first so they take priority over static mount) ──
@@ -109,6 +240,7 @@ async def api_root():
         ],
     }
 
+
 @app.get("/api/health")
 async def api_health():
     db_ok = False
@@ -121,7 +253,7 @@ async def api_health():
         cur.execute("SELECT version();")
         db_version = cur.fetchone()[0]
         cur.close()
-        conn.close()
+        release_db(conn)
         db_ok = True
         db_latency_ms = round((time.monotonic() - start) * 1000, 1)
     except Exception:
@@ -150,7 +282,7 @@ async def api_db_check():
         )
         dbs = [row[0] for row in cur.fetchall()]
         cur.close()
-        conn.close()
+        release_db(conn)
         return {
             "database": DB_NAME,
             "connected": True,
@@ -170,20 +302,10 @@ async def api_db_items():
     try:
         conn = get_db()
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-        cur.execute(
-            """
-            CREATE TABLE IF NOT EXISTS items (
-                id SERIAL PRIMARY KEY,
-                name TEXT NOT NULL,
-                created_at TIMESTAMPTZ DEFAULT NOW()
-            );
-            """
-        )
         cur.execute("SELECT id, name, created_at FROM items ORDER BY id;")
         rows = cur.fetchall()
         cur.close()
-        conn.commit()
-        conn.close()
+        release_db(conn)
         return {"items": [dict(r) for r in rows]}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -203,16 +325,6 @@ async def api_db_seed():
         conn = get_db()
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
-        cur.execute(
-            """
-            CREATE TABLE IF NOT EXISTS items (
-                id SERIAL PRIMARY KEY,
-                name TEXT NOT NULL,
-                created_at TIMESTAMPTZ DEFAULT NOW()
-            );
-            """
-        )
-
         inserted = 0
         for name in sample_items:
             cur.execute(
@@ -226,7 +338,7 @@ async def api_db_seed():
         rows = cur.fetchall()
         cur.close()
         conn.commit()
-        conn.close()
+        release_db(conn)
         return {
             "seeded": inserted,
             "total": len(rows),
@@ -252,19 +364,6 @@ async def api_waitlist(data: dict):
 
         cur.execute(
             """
-            CREATE TABLE IF NOT EXISTS waitlist (
-                id SERIAL PRIMARY KEY,
-                name TEXT,
-                email TEXT NOT NULL UNIQUE,
-                company TEXT,
-                projects TEXT,
-                signed_up_at TIMESTAMPTZ DEFAULT NOW()
-            );
-            """
-        )
-
-        cur.execute(
-            """
             INSERT INTO waitlist (name, email, company, projects)
             VALUES (%s, %s, %s, %s)
             ON CONFLICT (email) DO UPDATE SET
@@ -279,7 +378,7 @@ async def api_waitlist(data: dict):
         row = cur.fetchone()
         cur.close()
         conn.commit()
-        conn.close()
+        release_db(conn)
 
         return {
             "status": "signed_up",
@@ -309,26 +408,13 @@ async def api_auth_signup(data: dict):
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
         cur.execute(
-            """
-            CREATE TABLE IF NOT EXISTS users (
-                id SERIAL PRIMARY KEY,
-                email TEXT NOT NULL UNIQUE,
-                password_hash TEXT NOT NULL,
-                name TEXT NOT NULL DEFAULT '',
-                timezone TEXT DEFAULT 'UTC',
-                created_at TIMESTAMPTZ DEFAULT NOW()
-            );
-            """
-        )
-
-        cur.execute(
             "INSERT INTO users (email, password_hash, name, timezone) VALUES (%s, %s, %s, 'UTC') RETURNING id, email, name, timezone;",
             (email, hashed, name),
         )
         row = cur.fetchone()
         cur.close()
         conn.commit()
-        conn.close()
+        release_db(conn)
 
         return {"id": row["id"], "email": row["email"], "name": row["name"], "timezone": row["timezone"]}
     except psycopg2.errors.UniqueViolation:
@@ -351,7 +437,7 @@ async def api_auth_login(data: dict, response: Response):
         cur.execute("SELECT id, email, name, password_hash FROM users WHERE email = %s;", (email,))
         row = cur.fetchone()
         cur.close()
-        conn.close()
+        release_db(conn)
 
         if not row or not check_password(password, row["password_hash"]):
             raise HTTPException(status_code=401, detail="Invalid email or password.")
@@ -363,7 +449,7 @@ async def api_auth_login(data: dict, response: Response):
             key="session",
             value=token,
             httponly=True,
-            secure=True,
+            secure=COOKIE_SECURE,
             samesite="lax",
             max_age=86400 * 30,
         )
@@ -438,7 +524,7 @@ async def vendors_detail_page(request: Request, vendor_id: int):
         cur.execute("SELECT id, name, email, phone, address, notes, created_at, updated_at FROM vendors WHERE id = %s AND user_id = %s;", (vendor_id, user["id"]))
         row = cur.fetchone()
         cur.close()
-        conn.close()
+        release_db(conn)
         if not row:
             return templates.TemplateResponse("dashboard.html", {"request": request, "user": user, "error": "Vendor not found."})
         return templates.TemplateResponse("vendors/detail.html", {"request": request, "user": user, "vendor": dict(row)})
@@ -457,7 +543,7 @@ async def vendors_edit_page(request: Request, vendor_id: int):
         cur.execute("SELECT id, name, email, phone, address, notes, created_at, updated_at FROM vendors WHERE id = %s AND user_id = %s;", (vendor_id, user["id"]))
         row = cur.fetchone()
         cur.close()
-        conn.close()
+        release_db(conn)
         if not row:
             return templates.TemplateResponse("dashboard.html", {"request": request, "user": user, "error": "Vendor not found."})
         return templates.TemplateResponse("vendors/edit.html", {"request": request, "user": user, "vendor": dict(row)})
@@ -484,7 +570,7 @@ async def cois_list_page(request: Request, vendor_id: int):
         cur.execute("SELECT id, name FROM vendors WHERE id = %s AND user_id = %s;", (vendor_id, user["id"]))
         vendor = cur.fetchone()
         cur.close()
-        conn.close()
+        release_db(conn)
         if not vendor:
             return templates.TemplateResponse("dashboard.html", {"request": request, "user": user, "error": "Vendor not found."})
         return templates.TemplateResponse("cois/list.html", {"request": request, "user": user, "vendor_id": vendor_id, "vendor_name": vendor["name"]})
@@ -503,7 +589,7 @@ async def cois_upload_page(request: Request, vendor_id: int):
         cur.execute("SELECT id, name FROM vendors WHERE id = %s AND user_id = %s;", (vendor_id, user["id"]))
         vendor = cur.fetchone()
         cur.close()
-        conn.close()
+        release_db(conn)
         if not vendor:
             return templates.TemplateResponse("dashboard.html", {"request": request, "user": user, "error": "Vendor not found."})
         return templates.TemplateResponse("cois/upload.html", {"request": request, "user": user, "vendor_id": vendor_id, "vendor_name": vendor["name"]})
@@ -523,28 +609,12 @@ async def api_vendors(request: Request):
         conn = get_db()
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         cur.execute(
-            """
-            CREATE TABLE IF NOT EXISTS vendors (
-                id SERIAL PRIMARY KEY,
-                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-                name TEXT NOT NULL,
-                email TEXT DEFAULT '',
-                phone TEXT DEFAULT '',
-                address TEXT DEFAULT '',
-                notes TEXT DEFAULT '',
-                created_at TIMESTAMPTZ DEFAULT NOW(),
-                updated_at TIMESTAMPTZ DEFAULT NOW(),
-                magic_token TEXT DEFAULT NULL
-            );
-            """
-        )
-        cur.execute(
             "SELECT id, name, email, phone, address, notes, created_at, updated_at FROM vendors WHERE user_id = %s ORDER BY name;",
             (user["id"],),
         )
         rows = cur.fetchall()
         cur.close()
-        conn.close()
+        release_db(conn)
         return {"vendors": [dict(r) for r in rows]}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -569,29 +639,13 @@ async def api_vendors_create(data: dict, request: Request):
         conn = get_db()
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         cur.execute(
-            """
-            CREATE TABLE IF NOT EXISTS vendors (
-                id SERIAL PRIMARY KEY,
-                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-                name TEXT NOT NULL,
-                email TEXT DEFAULT '',
-                phone TEXT DEFAULT '',
-                address TEXT DEFAULT '',
-                notes TEXT DEFAULT '',
-                created_at TIMESTAMPTZ DEFAULT NOW(),
-                updated_at TIMESTAMPTZ DEFAULT NOW(),
-                magic_token TEXT DEFAULT NULL
-            );
-            """
-        )
-        cur.execute(
             "INSERT INTO vendors (user_id, name, email, phone, address, notes) VALUES (%s, %s, %s, %s, %s, %s) RETURNING id, name, email, phone, address, notes, created_at, updated_at;",
             (user["id"], name, email, phone, address, notes),
         )
         row = cur.fetchone()
         cur.close()
         conn.commit()
-        conn.close()
+        release_db(conn)
         return {"id": row["id"], "name": row["name"], "email": row["email"], "phone": row["phone"], "address": row["address"], "notes": row["notes"], "created_at": row["created_at"], "updated_at": row["updated_at"]}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -612,7 +666,7 @@ async def api_vendors_get(request: Request, vendor_id: int):
         )
         row = cur.fetchone()
         cur.close()
-        conn.close()
+        release_db(conn)
         if not row:
             raise HTTPException(status_code=404, detail="Vendor not found.")
         return {"id": row["id"], "name": row["name"], "email": row["email"], "phone": row["phone"], "address": row["address"], "notes": row["notes"], "created_at": row["created_at"], "updated_at": row["updated_at"]}
@@ -647,7 +701,7 @@ async def api_vendors_update(request: Request, vendor_id: int, data: dict):
         row = cur.fetchone()
         cur.close()
         conn.commit()
-        conn.close()
+        release_db(conn)
         if not row:
             raise HTTPException(status_code=404, detail="Vendor not found.")
         return {"id": row["id"], "name": row["name"], "email": row["email"], "phone": row["phone"], "address": row["address"], "notes": row["notes"], "created_at": row["created_at"], "updated_at": row["updated_at"]}
@@ -673,7 +727,7 @@ async def api_vendors_delete(request: Request, vendor_id: int):
         row = cur.fetchone()
         cur.close()
         conn.commit()
-        conn.close()
+        release_db(conn)
         if not row:
             raise HTTPException(status_code=404, detail="Vendor not found.")
         return {"status": "deleted", "id": vendor_id}
@@ -695,30 +749,6 @@ async def api_cois(request: Request, vendor_id: int | None = None):
         conn = get_db()
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
-        cur.execute(
-            """
-            CREATE TABLE IF NOT EXISTS cois (
-                id SERIAL PRIMARY KEY,
-                vendor_id INTEGER NOT NULL REFERENCES vendors(id) ON DELETE CASCADE,
-                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-                pdf_data BYTEA DEFAULT NULL,
-                pdf_filename TEXT DEFAULT '',
-                insurance_type TEXT DEFAULT '',
-                expiring_date DATE DEFAULT NULL,
-                issued_date DATE DEFAULT NULL,
-                notes TEXT DEFAULT '',
-                created_at TIMESTAMPTZ DEFAULT NOW(),
-                updated_at TIMESTAMPTZ DEFAULT NOW(),
-                pdf_path TEXT DEFAULT NULL,
-                status TEXT DEFAULT NULL,
-                notified_email TEXT DEFAULT NULL,
-                archived BOOLEAN DEFAULT FALSE,
-                last_reminder_days_out INTEGER DEFAULT NULL,
-                alert_sent_at TIMESTAMPTZ DEFAULT NULL
-            );
-            """
-        )
-
         if vendor_id:
             cur.execute(
                 "SELECT c.id, c.vendor_id, c.insurance_type, c.expiring_date, c.issued_date, c.notes, c.created_at, c.updated_at, v.name AS vendor_name FROM cois c JOIN vendors v ON c.vendor_id = v.id WHERE c.vendor_id = %s AND c.user_id = %s ORDER BY c.expiring_date;",
@@ -732,7 +762,7 @@ async def api_cois(request: Request, vendor_id: int | None = None):
 
         rows = cur.fetchall()
         cur.close()
-        conn.close()
+        release_db(conn)
         result = []
         for r in rows:
             d = dict(r)
@@ -791,34 +821,10 @@ async def api_cois_create(
     vendor = cur.fetchone()
     if not vendor:
         cur.close()
-        conn.close()
+        release_db(conn)
         raise HTTPException(status_code=404, detail="Vendor not found.")
 
     try:
-        cur.execute(
-            """
-            CREATE TABLE IF NOT EXISTS cois (
-                id SERIAL PRIMARY KEY,
-                vendor_id INTEGER NOT NULL REFERENCES vendors(id) ON DELETE CASCADE,
-                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-                pdf_data BYTEA DEFAULT NULL,
-                pdf_filename TEXT DEFAULT '',
-                insurance_type TEXT DEFAULT '',
-                expiring_date DATE DEFAULT NULL,
-                issued_date DATE DEFAULT NULL,
-                notes TEXT DEFAULT '',
-                created_at TIMESTAMPTZ DEFAULT NOW(),
-                updated_at TIMESTAMPTZ DEFAULT NOW(),
-                pdf_path TEXT DEFAULT NULL,
-                status TEXT DEFAULT NULL,
-                notified_email TEXT DEFAULT NULL,
-                archived BOOLEAN DEFAULT FALSE,
-                last_reminder_days_out INTEGER DEFAULT NULL,
-                alert_sent_at TIMESTAMPTZ DEFAULT NULL
-            );
-            """
-        )
-
         expiring = None
         if expiring_date:
             try:
@@ -840,7 +846,7 @@ async def api_cois_create(
         row = cur.fetchone()
         cur.close()
         conn.commit()
-        conn.close()
+        release_db(conn)
 
         return {
             "id": row["id"],
@@ -877,7 +883,7 @@ async def api_cois_get(request: Request, coi_id: int):
         )
         row = cur.fetchone()
         cur.close()
-        conn.close()
+        release_db(conn)
         if not row:
             raise HTTPException(status_code=404, detail="COI not found.")
         result = dict(row)
@@ -907,7 +913,7 @@ async def api_cois_download(request: Request, coi_id: int):
         )
         row = cur.fetchone()
         cur.close()
-        conn.close()
+        release_db(conn)
         if not row or not row["pdf_data"]:
             raise HTTPException(status_code=404, detail="COI not found or no PDF uploaded.")
         pdf_bytes = base64.b64decode(row["pdf_data"])
@@ -935,7 +941,7 @@ async def api_cois_delete(request: Request, coi_id: int):
         row = cur.fetchone()
         cur.close()
         conn.commit()
-        conn.close()
+        release_db(conn)
         if not row:
             raise HTTPException(status_code=404, detail="COI not found.")
         return {"status": "deleted", "id": coi_id}
@@ -956,47 +962,6 @@ async def api_dashboard(request: Request):
     try:
         conn = get_db()
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-
-        # Ensure tables exist
-        cur.execute(
-            """
-            CREATE TABLE IF NOT EXISTS cois (
-                id SERIAL PRIMARY KEY,
-                vendor_id INTEGER NOT NULL REFERENCES vendors(id) ON DELETE CASCADE,
-                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-                pdf_data BYTEA DEFAULT NULL,
-                pdf_filename TEXT DEFAULT '',
-                insurance_type TEXT DEFAULT '',
-                expiring_date DATE DEFAULT NULL,
-                issued_date DATE DEFAULT NULL,
-                notes TEXT DEFAULT '',
-                created_at TIMESTAMPTZ DEFAULT NOW(),
-                updated_at TIMESTAMPTZ DEFAULT NOW(),
-                pdf_path TEXT DEFAULT NULL,
-                status TEXT DEFAULT NULL,
-                notified_email TEXT DEFAULT NULL,
-                archived BOOLEAN DEFAULT FALSE,
-                last_reminder_days_out INTEGER DEFAULT NULL,
-                alert_sent_at TIMESTAMPTZ DEFAULT NULL
-            );
-            """
-        )
-        cur.execute(
-            """
-            CREATE TABLE IF NOT EXISTS vendors (
-                id SERIAL PRIMARY KEY,
-                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-                name TEXT NOT NULL,
-                email TEXT DEFAULT '',
-                phone TEXT DEFAULT '',
-                address TEXT DEFAULT '',
-                notes TEXT DEFAULT '',
-                created_at TIMESTAMPTZ DEFAULT NOW(),
-                updated_at TIMESTAMPTZ DEFAULT NOW(),
-                magic_token TEXT DEFAULT NULL
-            );
-            """
-        )
 
         utc_today = datetime.now(timezone.utc).date()
         thirty_days = utc_today + timedelta(days=30)
@@ -1049,7 +1014,7 @@ async def api_dashboard(request: Request):
                 item["expiring_date"] = item["expiring_date"].isoformat()
 
         cur.close()
-        conn.close()
+        release_db(conn)
 
         return {
             "stats": {
@@ -1077,21 +1042,10 @@ async def api_settings(request: Request):
     try:
         conn = get_db()
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-        cur.execute(
-            """
-            CREATE TABLE IF NOT EXISTS reminder_settings (
-                id SERIAL PRIMARY KEY,
-                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-                days_before_expiry INTEGER NOT NULL DEFAULT 30,
-                email_enabled BOOLEAN NOT NULL DEFAULT TRUE,
-                updated_at TIMESTAMPTZ DEFAULT NOW()
-            );
-            """
-        )
         cur.execute("SELECT days_before_expiry, email_enabled, updated_at FROM reminder_settings WHERE user_id = %s;", (user["id"],))
         row = cur.fetchone()
         cur.close()
-        conn.close()
+        release_db(conn)
         if row:
             return {"days_before_expiry": row["days_before_expiry"], "email_enabled": row["email_enabled"], "updated_at": row["updated_at"]}
         return {"days_before_expiry": 30, "email_enabled": True}
@@ -1116,24 +1070,13 @@ async def api_settings_update(request: Request, data: dict):
         conn = get_db()
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         cur.execute(
-            """
-            CREATE TABLE IF NOT EXISTS reminder_settings (
-                id SERIAL PRIMARY KEY,
-                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-                days_before_expiry INTEGER NOT NULL DEFAULT 30,
-                email_enabled BOOLEAN NOT NULL DEFAULT TRUE,
-                updated_at TIMESTAMPTZ DEFAULT NOW()
-            );
-            """
-        )
-        cur.execute(
             "INSERT INTO reminder_settings (user_id, days_before_expiry, email_enabled) VALUES (%s, %s, %s) ON CONFLICT (user_id) DO UPDATE SET days_before_expiry = %s, email_enabled = %s, updated_at = NOW() RETURNING days_before_expiry, email_enabled, updated_at;",
             (user["id"], days, email_enabled, days, email_enabled),
         )
         row = cur.fetchone()
         cur.close()
         conn.commit()
-        conn.close()
+        release_db(conn)
         return {"days_before_expiry": row["days_before_expiry"], "email_enabled": row["email_enabled"], "updated_at": row["updated_at"]}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -1149,6 +1092,6 @@ async def debug_templates():
     return {"exists": True, "path": tdir, "contents": sorted(os.listdir(tdir))}
 
 
-# ── Static files ────────────────────────────────────────────────────────────
+# ── Static files ─────────────────────────────────────────────────────────────
 # Mounted AFTER API routes so API paths take priority.
 app.mount("/", StaticFiles(directory="/app/html", html=True), name="static")
