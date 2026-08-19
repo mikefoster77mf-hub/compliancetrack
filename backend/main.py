@@ -9,6 +9,7 @@ from datetime import date, datetime, timedelta, timezone
 from scheduler import start_scheduler
 
 from uploads import router as uploads_router
+from payments import create_payments_router
 
 
 # ── Database env vars (all required, no defaults) ─────────────────────────────
@@ -118,6 +119,10 @@ async def get_current_user(request: Request) -> dict | None:
     return None
 
 
+# Mount payments router (after get_current_user is defined)
+app.include_router(create_payments_router(get_db, release_db, get_current_user))
+
+
 # ── Schema init (runs once at startup) ────────────────────────────────────────
 
 def init_db():
@@ -157,6 +162,11 @@ def init_db():
             password_hash TEXT NOT NULL,
             name TEXT NOT NULL DEFAULT '',
             timezone TEXT DEFAULT 'UTC',
+            subscription_status TEXT DEFAULT 'none',
+            subscription_id TEXT,
+            subscription_plan TEXT,
+            subscription_ends_at TIMESTAMPTZ,
+            lemon_squeezy_customer_id TEXT,
             created_at TIMESTAMPTZ DEFAULT NOW()
         );
         """
@@ -213,6 +223,16 @@ def init_db():
     )
 
     # ── Migrations for existing tables ──────────────────────────────────────────
+    # Add subscription columns to users if missing (old schema didn't have them)
+    for col, ddl in (
+        ("subscription_status", "TEXT DEFAULT 'none'"),
+        ("subscription_id", "TEXT"),
+        ("subscription_plan", "TEXT"),
+        ("subscription_ends_at", "TIMESTAMPTZ"),
+        ("lemon_squeezy_customer_id", "TEXT"),
+    ):
+        cur.execute(f"ALTER TABLE users ADD COLUMN IF NOT EXISTS {col} {ddl};")
+
     # Add timezone to users if missing (old schema didn't have it)
     cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS timezone TEXT DEFAULT 'UTC';")
 
@@ -242,6 +262,9 @@ async def api_root():
             "/api/cois",
             "/api/dashboard",
             "/api/settings",
+            "/api/payments/checkout",
+            "/api/payments/subscription",
+            "/api/payments/webhook",
         ],
     }
 
