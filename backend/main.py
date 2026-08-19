@@ -211,6 +211,11 @@ def init_db():
         );
         """
     )
+
+    # ── Migrations for existing tables ──────────────────────────────────────────
+    # Add timezone to users if missing (old schema didn't have it)
+    cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS timezone TEXT DEFAULT 'UTC';")
+
     conn.commit()
     cur.close()
     release_db(conn)
